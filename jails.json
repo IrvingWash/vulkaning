@@ -2,7 +2,8 @@
     "roots": [
         "source/main.jai",
         "install_tools.jai",
-        "build.jai"
+        "build.jai",
+        "modules/SDL3/generate.jai"
     ],
     "build_root": "build.jai",
     "intermediate_path": ".build",
