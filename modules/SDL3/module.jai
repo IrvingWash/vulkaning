@@ -994,6 +994,8 @@ init_subsystem :: (flags: Init_Flags) -> bool #foreign libsdl3 "SDL_InitSubSyste
 poll_event :: (event: *Event) -> bool #foreign libsdl3 "SDL_PollEvent";
 create_window :: (title: *u8, w: s32, h: s32, flags: Window_Flags) -> *Window #foreign libsdl3 "SDL_CreateWindow";
 
+vulkan_get_instance_extensions :: (count: *u32) -> **u8 #foreign libsdl3 "SDL_Vulkan_GetInstanceExtensions";
+
 #scope_file
 
 #if OS == {

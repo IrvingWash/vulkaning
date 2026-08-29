@@ -6,6 +6,7 @@
 );
 
 SDL :: #import "SDL3";
+Renderer :: #import,dir "Renderer"()(DEBUG = DEBUG);
 
 State :: struct {
     is_running: bool;
@@ -41,6 +42,8 @@ init :: (state: *State) {
         .VULKAN | .RESIZABLE,
     );
     assert(state.window != null, "Failed to create SDL Window");
+
+    Renderer.init(get_sdl_instance_extensions);
 }
 
 process_input :: (state: *State) {
@@ -56,4 +59,19 @@ process_input :: (state: *State) {
                 break;
         }
     }
+}
+
+get_sdl_instance_extensions :: () -> [..]*u8 {
+    extensions: [..]*u8;
+
+    count: u32;
+    raw_extensions := SDL.vulkan_get_instance_extensions(*count);
+
+    array_resize(*extensions, count);
+
+    for 0 .. count - 1 {
+        extensions[it] = raw_extensions[it];
+    }
+
+    return extensions;
 }
