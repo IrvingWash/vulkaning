@@ -1,0 +1,3 @@
+[submodule "modules/Jai_Vulkan/Vulkan-Headers"]
+	path = modules/Jai_Vulkan/Vulkan-Headers
+	url = git@github.com:KhronosGroup/Vulkan-Headers.git
