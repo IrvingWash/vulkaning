@@ -1,14 +1,20 @@
-Instance        :: #type *Instance_T;
-Surface_Khr     :: #type *Surface_Khr_T;
-Physical_Device :: #type *Physical_Device_T;
-Device          :: #type *Device_T;
-Queue           :: #type *Queue_T;
-Device_Memory   :: #type *Device_Memory_T;
-Swapchain_Khr   :: #type *Swapchain_Khr_T;
-Image           :: #type *Image_T;
-Image_View      :: #type *Image_View_T;
-Semaphore       :: #type *Semaphore_T;
-Shader_Module   :: #type *Shader_Module_T;
+Instance              :: #type *Instance_T;
+Surface_Khr           :: #type *Surface_Khr_T;
+Physical_Device       :: #type *Physical_Device_T;
+Device                :: #type *Device_T;
+Queue                 :: #type *Queue_T;
+Device_Memory         :: #type *Device_Memory_T;
+Swapchain_Khr         :: #type *Swapchain_Khr_T;
+Image                 :: #type *Image_T;
+Image_View            :: #type *Image_View_T;
+Semaphore             :: #type *Semaphore_T;
+Shader_Module         :: #type *Shader_Module_T;
+Descriptor_Set_Layout :: #type *Descriptor_Set_Layout_T;
+Pipeline              :: #type *Pipeline_T;
+Pipeline_Layout       :: #type *Pipeline_Layout_T;
+Sample_Mask           :: #type *Sample_Mask_T;
+Render_Pass           :: #type *Render_Pass_T;
+Pipeline_Cache        :: #type *Pipeline_Cache_T;
 
 Bool :: #type,isa u32;
 TRUE:  Bool : 1;
@@ -574,6 +580,239 @@ Shader_Module_Create_Info :: struct {
     p_code:    *u32;
 }
 
+Pipeline_Layout_Create_Info :: struct {
+    s_type :=                  Structure_Type.PIPELINE_LAYOUT_CREATE_INFO;
+    p_next:                    *void;
+    flags:                     Pipeline_Layout_Create_Flags;
+    set_layout_count:          u32;
+    p_set_layouts:             *Descriptor_Set_Layout;
+    push_constant_range_count: u32;
+    p_push_constant_ranges:    *Push_Constant_Range;
+}
+
+Push_Constant_Range :: struct {
+    stage_flags: Shader_Stage_Flags;
+    offset:     u32;
+    size:       u32;
+}
+
+Pipeline_Shader_Stage_Create_Info :: struct {
+    s_type                 := Structure_Type.PIPELINE_SHADER_STAGE_CREATE_INFO;
+    p_next:                *void;
+    flags:                 Pipeline_Shader_Stage_Create_Flags;
+    stage:                 Shader_Stage_Flags;
+    module:                Shader_Module;
+    p_name:                *u8;
+    p_specialization_info: *Specialization_Info;
+}
+
+Specialization_Info :: struct {
+    map_entry_count: u32;
+    p_map_entries:   *Specialization_Map_Entry;
+    data_size:       u64;
+    p_data:          *void;
+}
+
+Specialization_Map_Entry :: struct {
+    constant_id: u32;
+    offset:      u32;
+    size:        u64;
+}
+
+Pipeline_Vertex_Input_State_Create_Info :: struct {
+    s_type :=                           Structure_Type.PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    p_next:                             *void;
+    flags:                              Pipeline_Vertex_Input_State_Create_Flags;
+    vertex_binding_description_count:   u32;
+    p_vertex_binding_descriptions:      *Vertex_Input_Binding_Description;
+    vertex_attribute_description_count: u32;
+    p_vertex_attribute_descriptions:    *Vertex_Input_Attribute_Description;
+}
+
+Vertex_Input_Binding_Description :: struct {
+    binding:   u32;
+    stride:    u32;
+    input_rate: Vertex_Input_Rate;
+}
+
+Vertex_Input_Attribute_Description :: struct {
+    location: u32;
+    binding:  u32;
+    format:   Format;
+    offset:   u32;
+}
+
+Pipeline_Input_Assembly_State_Create_Info :: struct {
+    s_type :=                 Structure_Type.PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    p_next:                   *void;
+    flags:                    Pipeline_Input_Assembly_State_Create_Flags;
+    topology:                 Primitive_Topology;
+    primitive_restart_enable: Bool;
+}
+
+Pipeline_Depth_Stencil_State_Create_Info :: struct {
+    s_type :=                 Structure_Type.PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    p_next:                   *void;
+    flags:                    Pipeline_Depth_Stencil_State_Create_Flags;
+    depth_test_enable:        Bool;
+    depth_write_enable:       Bool;
+    depth_compare_op:         Compare_Op;
+    depth_bounds_test_enable: Bool;
+    stencil_test_enable:      Bool;
+    front:                    Stencil_Op_State;
+    back:                     Stencil_Op_State;
+    min_depth_bounds:         float;
+    max_depth_bounds:         float;
+}
+
+Stencil_Op_State :: struct {
+    fail_op:       Stencil_Op;
+    pass_op:       Stencil_Op;
+    depth_fail_op: Stencil_Op;
+    compare_op:    Compare_Op;
+    compare_mask:  u32;
+    write_mask:    u32;
+    reference:     u32;
+}
+
+Pipeline_Viewport_State_Create_Info :: struct {
+    s_type :=       Structure_Type.PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    p_next:         *void;
+    flags:          Pipeline_Viewport_State_Create_Flags;
+    viewport_count: u32;
+    p_viewports:    *Viewport;
+    scissor_count:  u32;
+    p_scissors:     *Rect_2D;
+}
+
+Rect_2D :: struct {
+    offset: Offset_2D;
+    extent: Extent_2D;
+}
+
+Offset_2D :: struct {
+    x: s32;
+    y: s32;
+}
+
+Viewport :: struct {
+    x:         float;
+    y:         float;
+    width:     float;
+    height:    float;
+    min_depth: float;
+    max_depth: float;
+}
+
+Pipeline_Rasterization_State_Create_Info :: struct {
+    s_type :=                   Structure_Type.PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    p_next:                     *void;
+    flags:                      Pipeline_Rasterization_State_Create_Flags;
+    depth_clamp_enable:         Bool;
+    rasterizer_discard_enable:  Bool;
+    polygon_mode:               Polygon_Mode;
+    cull_mode:                  Cull_Mode_Flags;
+    front_face:                 Front_Face;
+    depth_bias_enable:          Bool;
+    depth_bias_constant_factor: float;
+    depth_bias_clamp:           float;
+    depth_bias_slope_factor:    float;
+    line_width:                 float;
+}
+
+Pipeline_Multisample_State_Create_Info :: struct {
+    s_type :=                 Structure_Type.PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    p_next:                   *void;
+    flags:                    Pipeline_Multisample_State_Create_Flags;
+    rasterization_samples:    Sample_Count_Flags;
+    sample_shading_enable:    Bool;
+    min_sample_shading:       float;
+    p_sample_mask:            *Sample_Mask;
+    alpha_to_coverage_enable: Bool;
+    alpha_to_one_enable:      Bool;
+}
+
+Pipeline_Color_Blend_Attachment_State :: struct {
+    blend_enable:           Bool;
+    src_color_blend_factor: Blend_Factor;
+    dst_color_blend_factor: Blend_Factor;
+    color_blend_op:         Blend_Op;
+    src_alpha_blend_factor: Blend_Factor;
+    dst_alpha_blend_factor: Blend_Factor;
+    alpha_blend_op:         Blend_Op;
+    color_write_mask:       Color_Component_Flags;
+}
+
+Pipeline_Color_Blend_State_Create_Info :: struct {
+    s_type :=         Structure_Type.PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    p_next:           *void;
+    flags:            Pipeline_Color_Blend_State_Create_Flags;
+    logic_op_enable:  Bool;
+    logic_op:         Logic_Op;
+    attachment_count: u32;
+    p_attachments:    *Pipeline_Color_Blend_Attachment_State;
+    blend_constants:  [4]float;
+}
+
+Pipeline_Dynamic_State_Create_Info :: struct {
+    s_type :=            Structure_Type.PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    p_next:              *void;
+    flags:               Pipeline_Dynamic_State_Create_Flags;
+    dynamic_state_count: u32;
+    p_dynamic_states:    *Dynamic_State;
+}
+
+Pipeline_Rendering_Create_Info :: struct {
+    s_type :=                   Structure_Type.PIPELINE_RENDERING_CREATE_INFO;
+    p_next:                     *void;
+    view_mask:                  u32;
+    color_attachment_count:     u32;
+    p_color_attachment_formats: *Format;
+    depth_attachment_format:    Format;
+    stencil_attachment_format:  Format;
+}
+
+Graphics_Pipeline_Create_Info :: struct {
+    s_type                  := Structure_Type.GRAPHICS_PIPELINE_CREATE_INFO;
+    p_next:                 *void;
+    flags:                  Pipeline_Create_Flags;
+    stage_count:            u32;
+    p_stages:               *Pipeline_Shader_Stage_Create_Info;
+    p_vertex_input_state:   *Pipeline_Vertex_Input_State_Create_Info;
+    p_input_assembly_state: *Pipeline_Input_Assembly_State_Create_Info;
+    p_tessellation_state:   *Pipeline_Tessellation_State_Create_Info;
+    p_viewport_state:       *Pipeline_Viewport_State_Create_Info;
+    p_rasterization_state:  *Pipeline_Rasterization_State_Create_Info;
+    p_multisample_state:    *Pipeline_Multisample_State_Create_Info;
+    p_depth_stencil_state:  *Pipeline_Depth_Stencil_State_Create_Info;
+    p_color_blend_state:    *Pipeline_Color_Blend_State_Create_Info;
+    p_dynamic_state:        *Pipeline_Dynamic_State_Create_Info;
+    layout:                 Pipeline_Layout;
+    render_pass:            Render_Pass;
+    subpass:                u32;
+    base_pipeline_handle:   Pipeline;
+    base_pipeline_index:    s32;
+}
+
+Pipeline_Tessellation_State_Create_Info :: struct {
+    s_type :=             Structure_Type.PIPELINE_TESSELLATION_STATE_CREATE_INFO;
+    p_next:               *void;
+    flags:                Pipeline_Tessellation_State_Create_Flags;
+    patch_control_points: u32;
+}
+
+Stencil_Op :: enum u32 {
+    KEEP                :: 0;
+    ZERO                :: 1;
+    REPLACE             :: 2;
+    INCREMENT_AND_CLAMP :: 3;
+    DECREMENT_AND_CLAMP :: 4;
+    INVERT              :: 5;
+    INCREMENT_AND_WRAP  :: 6;
+    DECREMENT_AND_WRAP  :: 7;
+    MAX_ENUM            :: 2147483647;
+}
+
 Component_Swizzle :: enum u32 {
     IDENTITY :: 0;
     ZERO     :: 1;
@@ -747,6 +986,139 @@ Memory_Property_Flags :: enum_flags u32 {
 }
 
 Shader_Module_Create_Flags :: enum_flags u32 {}
+
+Shader_Stage_Flags :: enum_flags u32 {
+    VERTEX                  :: 1;
+    TESSELLATION_CONTROL    :: 2;
+    TESSELLATION_EVALUATION :: 4;
+    GEOMETRY                :: 8;
+    FRAGMENT                :: 16;
+    COMPUTE                 :: 32;
+    ALL_GRAPHICS            :: 31;
+    ALL                     :: 2147483647;
+    RAYGEN_KHR              :: 256;
+    ANY_HIT_KHR             :: 512;
+    CLOSEST_HIT_KHR         :: 1024;
+    MISS_KHR                :: 2048;
+    INTERSECTION_KHR        :: 4096;
+    CALLABLE_KHR            :: 8192;
+    TASK_EXT                :: 64;
+    MESH_EXT                :: 128;
+    SUBPASS_SHADING_HUAWEI  :: 16384;
+    CLUSTER_CULLING_HUAWEI  :: 524288;
+    RAYGEN_NV               :: 256;
+    ANY_HIT_NV              :: 512;
+    CLOSEST_HIT_NV          :: 1024;
+    MISS_NV                 :: 2048;
+    INTERSECTION_NV         :: 4096;
+    CALLABLE_NV             :: 8192;
+    TASK_NV                 :: 64;
+    MESH_NV                 :: 128;
+    FLAG_BITS_MAX_ENUM      :: 2147483647;
+}
+
+Pipeline_Layout_Create_Flags :: enum_flags u32 {
+    INDEPENDENT_SETS_EXT :: 2;
+    NO_TASK_SHADER_KHR   :: 4;
+    FLAG_BITS_MAX_ENUM   :: 2147483647;
+}
+
+Pipeline_Shader_Stage_Create_Flags :: enum_flags u32 {
+    ALLOW_VARYING_SUBGROUP_SIZE     :: 1;
+    REQUIRE_FULL_SUBGROUPS          :: 2;
+    ALLOW_VARYING_SUBGROUP_SIZE_EXT :: 1;
+    REQUIRE_FULL_SUBGROUPS_EXT      :: 2;
+    FLAG_BITS_MAX_ENUM              :: 2147483647;
+}
+
+Pipeline_Vertex_Input_State_Create_Flags :: enum_flags u32 {}
+
+Pipeline_Input_Assembly_State_Create_Flags :: enum_flags u32 {}
+
+Pipeline_Depth_Stencil_State_Create_Flags :: enum_flags u32 {
+    RASTERIZATION_ORDER_ATTACHMENT_DEPTH_ACCESS_EXT   :: 1;
+    RASTERIZATION_ORDER_ATTACHMENT_STENCIL_ACCESS_EXT :: 2;
+    RASTERIZATION_ORDER_ATTACHMENT_DEPTH_ACCESS_ARM   :: 1;
+    RASTERIZATION_ORDER_ATTACHMENT_STENCIL_ACCESS_ARM :: 2;
+    FLAG_BITS_MAX_ENUM                                :: 2147483647;
+}
+
+Pipeline_Viewport_State_Create_Flags :: enum_flags u32 {}
+
+Pipeline_Rasterization_State_Create_Flags :: enum_flags u32 {}
+
+Cull_Mode_Flags :: enum_flags u32 {
+    NONE               :: 0;
+    FRONT              :: 1;
+    BACK               :: 2;
+    FRONT_AND_BACK     :: 3;
+    FLAG_BITS_MAX_ENUM :: 2147483647;
+}
+
+Pipeline_Multisample_State_Create_Flags :: enum_flags u32 {}
+
+Color_Component_Flags :: enum_flags u32 {
+    R                  :: 1;
+    G                  :: 2;
+    B                  :: 4;
+    A                  :: 8;
+    FLAG_BITS_MAX_ENUM :: 2147483647;
+}
+
+Pipeline_Color_Blend_State_Create_Flags :: enum_flags u32 {
+    RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXT :: 1;
+    RASTERIZATION_ORDER_ATTACHMENT_ACCESS_ARM :: 1;
+    FLAG_BITS_MAX_ENUM                        :: 2147483647;
+}
+
+Pipeline_Dynamic_State_Create_Flags :: enum_flags u32 {}
+
+Pipeline_Tessellation_State_Create_Flags :: enum_flags u32 {}
+
+Pipeline_Create_Flags :: enum_flags u32 {
+    CREATE_DISABLE_OPTIMIZATION                                     :: 1;
+    CREATE_ALLOW_DERIVATIVES                                        :: 2;
+    CREATE_DERIVATIVE                                               :: 4;
+    CREATE_DISPATCH_BASE                                            :: 16;
+    CREATE_VIEW_INDEX_FROM_DEVICE_INDEX                             :: 8;
+    CREATE_FAIL_ON_PIPELINE_COMPILE_REQUIRED                        :: 256;
+    CREATE_EARLY_RETURN_ON_FAILURE                                  :: 512;
+    CREATE_NO_PROTECTED_ACCESS                                      :: 134217728;
+    CREATE_PROTECTED_ACCESS_ONLY                                    :: 1073741824;
+    CREATE_RAY_TRACING_NO_NULL_ANY_HIT_SHADERS_KHR                  :: 16384;
+    CREATE_RAY_TRACING_NO_NULL_CLOSEST_HIT_SHADERS_KHR              :: 32768;
+    CREATE_RAY_TRACING_NO_NULL_MISS_SHADERS_KHR                     :: 65536;
+    CREATE_RAY_TRACING_NO_NULL_INTERSECTION_SHADERS_KHR             :: 131072;
+    CREATE_RAY_TRACING_SKIP_TRIANGLES_KHR                           :: 4096;
+    CREATE_RAY_TRACING_SKIP_AABBS_KHR                               :: 8192;
+    CREATE_RAY_TRACING_SHADER_GROUP_HANDLE_CAPTURE_REPLAY_KHR       :: 524288;
+    CREATE_DEFER_COMPILE_NV                                         :: 32;
+    CREATE_RENDERING_FRAGMENT_DENSITY_MAP_ATTACHMENT_EXT            :: 4194304;
+    CREATE_RENDERING_FRAGMENT_SHADING_RATE_ATTACHMENT_KHR           :: 2097152;
+    CREATE_CAPTURE_STATISTICS_KHR                                   :: 64;
+    CREATE_CAPTURE_INTERNAL_REPRESENTATIONS_KHR                     :: 128;
+    CREATE_INDIRECT_BINDABLE_NV                                     :: 262144;
+    CREATE_LIBRARY_KHR                                              :: 2048;
+    CREATE_DESCRIPTOR_BUFFER_EXT                                    :: 536870912;
+    CREATE_RETAIN_LINK_TIME_OPTIMIZATION_INFO_EXT                   :: 8388608;
+    CREATE_LINK_TIME_OPTIMIZATION_EXT                               :: 1024;
+    CREATE_RAY_TRACING_ALLOW_MOTION_NV                              :: 1048576;
+    CREATE_COLOR_ATTACHMENT_FEEDBACK_LOOP_EXT                       :: 33554432;
+    CREATE_DEPTH_STENCIL_ATTACHMENT_FEEDBACK_LOOP_EXT               :: 67108864;
+    CREATE_RAY_TRACING_OPACITY_MICROMAP_EXT                         :: 16777216;
+
+    CREATE_VIEW_INDEX_FROM_DEVICE_INDEX_KHR                         :: 8;
+    CREATE_DISPATCH_BASE_KHR                                        :: 16;
+
+    RASTERIZATION_STATE_CREATE_FRAGMENT_DENSITY_MAP_ATTACHMENT_EXT  :: 4194304;
+
+    RASTERIZATION_STATE_CREATE_FRAGMENT_SHADING_RATE_ATTACHMENT_KHR :: 2097152;
+    CREATE_FAIL_ON_PIPELINE_COMPILE_REQUIRED_EXT                    :: 256;
+    CREATE_EARLY_RETURN_ON_FAILURE_EXT                              :: 512;
+    CREATE_NO_PROTECTED_ACCESS_EXT                                  :: 134217728;
+    CREATE_PROTECTED_ACCESS_ONLY_EXT                                :: 1073741824;
+    CREATE_FLAG_BITS_MAX_ENUM                                       :: 2147483647;
+}
 
 Image_Create_Flags :: enum u32 {
     SPARSE_BINDING                            :: 1;
@@ -2874,6 +3246,245 @@ Image_Layout :: enum u32 {
     MAX_ENUM                                       :: 2147483647;
 }
 
+Vertex_Input_Rate :: enum u32 {
+    VERTEX   :: 0;
+    INSTANCE :: 1;
+    MAX_ENUM :: 2147483647;
+}
+
+Primitive_Topology :: enum u32 {
+    POINT_LIST                    :: 0;
+    LINE_LIST                     :: 1;
+    LINE_STRIP                    :: 2;
+    TRIANGLE_LIST                 :: 3;
+    TRIANGLE_STRIP                :: 4;
+    TRIANGLE_FAN                  :: 5;
+    LINE_LIST_WITH_ADJACENCY      :: 6;
+    LINE_STRIP_WITH_ADJACENCY     :: 7;
+    TRIANGLE_LIST_WITH_ADJACENCY  :: 8;
+    TRIANGLE_STRIP_WITH_ADJACENCY :: 9;
+    PATCH_LIST                    :: 10;
+    MAX_ENUM                      :: 2147483647;
+}
+
+Compare_Op :: enum u32 {
+    NEVER            :: 0;
+    LESS             :: 1;
+    EQUAL            :: 2;
+    LESS_OR_EQUAL    :: 3;
+    GREATER          :: 4;
+    NOT_EQUAL        :: 5;
+    GREATER_OR_EQUAL :: 6;
+    ALWAYS           :: 7;
+    MAX_ENUM         :: 2147483647;
+}
+
+Polygon_Mode :: enum u32 {
+    FILL              :: 0;
+    LINE              :: 1;
+    POINT             :: 2;
+    FILL_RECTANGLE_NV :: 1000153000;
+    MAX_ENUM          :: 2147483647;
+}
+
+Front_Face :: enum u32 {
+    COUNTER_CLOCKWISE :: 0;
+    CLOCKWISE         :: 1;
+    MAX_ENUM          :: 2147483647;
+}
+
+Blend_Op :: enum u32 {
+    ADD                    :: 0;
+    SUBTRACT               :: 1;
+    REVERSE_SUBTRACT       :: 2;
+    MIN                    :: 3;
+    MAX                    :: 4;
+    ZERO_EXT               :: 1000148000;
+    SRC_EXT                :: 1000148001;
+    DST_EXT                :: 1000148002;
+    SRC_OVER_EXT           :: 1000148003;
+    DST_OVER_EXT           :: 1000148004;
+    SRC_IN_EXT             :: 1000148005;
+    DST_IN_EXT             :: 1000148006;
+    SRC_OUT_EXT            :: 1000148007;
+    DST_OUT_EXT            :: 1000148008;
+    SRC_ATOP_EXT           :: 1000148009;
+    DST_ATOP_EXT           :: 1000148010;
+    XOR_EXT                :: 1000148011;
+    MULTIPLY_EXT           :: 1000148012;
+    SCREEN_EXT             :: 1000148013;
+    OVERLAY_EXT            :: 1000148014;
+    DARKEN_EXT             :: 1000148015;
+    LIGHTEN_EXT            :: 1000148016;
+    COLORDODGE_EXT         :: 1000148017;
+    COLORBURN_EXT          :: 1000148018;
+    HARDLIGHT_EXT          :: 1000148019;
+    SOFTLIGHT_EXT          :: 1000148020;
+    DIFFERENCE_EXT         :: 1000148021;
+    EXCLUSION_EXT          :: 1000148022;
+    INVERT_EXT             :: 1000148023;
+    INVERT_RGB_EXT         :: 1000148024;
+    LINEARDODGE_EXT        :: 1000148025;
+    LINEARBURN_EXT         :: 1000148026;
+    VIVIDLIGHT_EXT         :: 1000148027;
+    LINEARLIGHT_EXT        :: 1000148028;
+    PINLIGHT_EXT           :: 1000148029;
+    HARDMIX_EXT            :: 1000148030;
+    HSL_HUE_EXT            :: 1000148031;
+    HSL_SATURATION_EXT     :: 1000148032;
+    HSL_COLOR_EXT          :: 1000148033;
+    HSL_LUMINOSITY_EXT     :: 1000148034;
+    PLUS_EXT               :: 1000148035;
+    PLUS_CLAMPED_EXT       :: 1000148036;
+    PLUS_CLAMPED_ALPHA_EXT :: 1000148037;
+    PLUS_DARKER_EXT        :: 1000148038;
+    MINUS_EXT              :: 1000148039;
+    MINUS_CLAMPED_EXT      :: 1000148040;
+    CONTRAST_EXT           :: 1000148041;
+    INVERT_OVG_EXT         :: 1000148042;
+    RED_EXT                :: 1000148043;
+    GREEN_EXT              :: 1000148044;
+    BLUE_EXT               :: 1000148045;
+    MAX_ENUM               :: 2147483647;
+}
+
+Blend_Factor :: enum u32 {
+    ZERO                     :: 0;
+    ONE                      :: 1;
+    SRC_COLOR                :: 2;
+    ONE_MINUS_SRC_COLOR      :: 3;
+    DST_COLOR                :: 4;
+    ONE_MINUS_DST_COLOR      :: 5;
+    SRC_ALPHA                :: 6;
+    ONE_MINUS_SRC_ALPHA      :: 7;
+    DST_ALPHA                :: 8;
+    ONE_MINUS_DST_ALPHA      :: 9;
+    CONSTANT_COLOR           :: 10;
+    ONE_MINUS_CONSTANT_COLOR :: 11;
+    CONSTANT_ALPHA           :: 12;
+    ONE_MINUS_CONSTANT_ALPHA :: 13;
+    SRC_ALPHA_SATURATE       :: 14;
+    SRC1_COLOR               :: 15;
+    ONE_MINUS_SRC1_COLOR     :: 16;
+    SRC1_ALPHA               :: 17;
+    ONE_MINUS_SRC1_ALPHA     :: 18;
+    MAX_ENUM                 :: 2147483647;
+}
+
+Logic_Op :: enum u32 {
+    CLEAR         :: 0;
+    AND           :: 1;
+    AND_REVERSE   :: 2;
+    COPY          :: 3;
+    AND_INVERTED  :: 4;
+    NO_OP         :: 5;
+    XOR           :: 6;
+    OR            :: 7;
+    NOR           :: 8;
+    EQUIVALENT    :: 9;
+    INVERT        :: 10;
+    OR_REVERSE    :: 11;
+    COPY_INVERTED :: 12;
+    OR_INVERTED   :: 13;
+    NAND          :: 14;
+    SET           :: 15;
+    MAX_ENUM      :: 2147483647;
+}
+
+Dynamic_State :: enum u32 {
+    VIEWPORT                                :: 0;
+    SCISSOR                                 :: 1;
+    LINE_WIDTH                              :: 2;
+    DEPTH_BIAS                              :: 3;
+    BLEND_CONSTANTS                         :: 4;
+    DEPTH_BOUNDS                            :: 5;
+    STENCIL_COMPARE_MASK                    :: 6;
+    STENCIL_WRITE_MASK                      :: 7;
+    STENCIL_REFERENCE                       :: 8;
+    CULL_MODE                               :: 1000267000;
+    FRONT_FACE                              :: 1000267001;
+    PRIMITIVE_TOPOLOGY                      :: 1000267002;
+    VIEWPORT_WITH_COUNT                     :: 1000267003;
+    SCISSOR_WITH_COUNT                      :: 1000267004;
+    VERTEX_INPUT_BINDING_STRIDE             :: 1000267005;
+    DEPTH_TEST_ENABLE                       :: 1000267006;
+    DEPTH_WRITE_ENABLE                      :: 1000267007;
+    DEPTH_COMPARE_OP                        :: 1000267008;
+    DEPTH_BOUNDS_TEST_ENABLE                :: 1000267009;
+    STENCIL_TEST_ENABLE                     :: 1000267010;
+    STENCIL_OP                              :: 1000267011;
+    RASTERIZER_DISCARD_ENABLE               :: 1000377001;
+    DEPTH_BIAS_ENABLE                       :: 1000377002;
+    PRIMITIVE_RESTART_ENABLE                :: 1000377004;
+    LINE_STIPPLE                            :: 1000259000;
+    VIEWPORT_W_SCALING_NV                   :: 1000087000;
+    DISCARD_RECTANGLE_EXT                   :: 1000099000;
+    DISCARD_RECTANGLE_ENABLE_EXT            :: 1000099001;
+    DISCARD_RECTANGLE_MODE_EXT              :: 1000099002;
+    SAMPLE_LOCATIONS_EXT                    :: 1000143000;
+    RAY_TRACING_PIPELINE_STACK_SIZE_KHR     :: 1000347000;
+    VIEWPORT_SHADING_RATE_PALETTE_NV        :: 1000164004;
+    VIEWPORT_COARSE_SAMPLE_ORDER_NV         :: 1000164006;
+    EXCLUSIVE_SCISSOR_ENABLE_NV             :: 1000205000;
+    EXCLUSIVE_SCISSOR_NV                    :: 1000205001;
+    FRAGMENT_SHADING_RATE_KHR               :: 1000226000;
+    VERTEX_INPUT_EXT                        :: 1000352000;
+    PATCH_CONTROL_POINTS_EXT                :: 1000377000;
+    LOGIC_OP_EXT                            :: 1000377003;
+    COLOR_WRITE_ENABLE_EXT                  :: 1000381000;
+    DEPTH_CLAMP_ENABLE_EXT                  :: 1000455003;
+    POLYGON_MODE_EXT                        :: 1000455004;
+    RASTERIZATION_SAMPLES_EXT               :: 1000455005;
+    SAMPLE_MASK_EXT                         :: 1000455006;
+    ALPHA_TO_COVERAGE_ENABLE_EXT            :: 1000455007;
+    ALPHA_TO_ONE_ENABLE_EXT                 :: 1000455008;
+    LOGIC_OP_ENABLE_EXT                     :: 1000455009;
+    COLOR_BLEND_ENABLE_EXT                  :: 1000455010;
+    COLOR_BLEND_EQUATION_EXT                :: 1000455011;
+    COLOR_WRITE_MASK_EXT                    :: 1000455012;
+    TESSELLATION_DOMAIN_ORIGIN_EXT          :: 1000455002;
+    RASTERIZATION_STREAM_EXT                :: 1000455013;
+    CONSERVATIVE_RASTERIZATION_MODE_EXT     :: 1000455014;
+    EXTRA_PRIMITIVE_OVERESTIMATION_SIZE_EXT :: 1000455015;
+    DEPTH_CLIP_ENABLE_EXT                   :: 1000455016;
+    SAMPLE_LOCATIONS_ENABLE_EXT             :: 1000455017;
+    COLOR_BLEND_ADVANCED_EXT                :: 1000455018;
+    PROVOKING_VERTEX_MODE_EXT               :: 1000455019;
+    LINE_RASTERIZATION_MODE_EXT             :: 1000455020;
+    LINE_STIPPLE_ENABLE_EXT                 :: 1000455021;
+    DEPTH_CLIP_NEGATIVE_ONE_TO_ONE_EXT      :: 1000455022;
+    VIEWPORT_W_SCALING_ENABLE_NV            :: 1000455023;
+    VIEWPORT_SWIZZLE_NV                     :: 1000455024;
+    COVERAGE_TO_COLOR_ENABLE_NV             :: 1000455025;
+    COVERAGE_TO_COLOR_LOCATION_NV           :: 1000455026;
+    COVERAGE_MODULATION_MODE_NV             :: 1000455027;
+    COVERAGE_MODULATION_TABLE_ENABLE_NV     :: 1000455028;
+    COVERAGE_MODULATION_TABLE_NV            :: 1000455029;
+    SHADING_RATE_IMAGE_ENABLE_NV            :: 1000455030;
+    REPRESENTATIVE_FRAGMENT_TEST_ENABLE_NV  :: 1000455031;
+    COVERAGE_REDUCTION_MODE_NV              :: 1000455032;
+    ATTACHMENT_FEEDBACK_LOOP_ENABLE_EXT     :: 1000524000;
+    DEPTH_CLAMP_RANGE_EXT                   :: 1000582000;
+    LINE_STIPPLE_EXT                        :: 1000259000;
+    CULL_MODE_EXT                           :: 1000267000;
+    FRONT_FACE_EXT                          :: 1000267001;
+    PRIMITIVE_TOPOLOGY_EXT                  :: 1000267002;
+    VIEWPORT_WITH_COUNT_EXT                 :: 1000267003;
+    SCISSOR_WITH_COUNT_EXT                  :: 1000267004;
+    VERTEX_INPUT_BINDING_STRIDE_EXT         :: 1000267005;
+    DEPTH_TEST_ENABLE_EXT                   :: 1000267006;
+    DEPTH_WRITE_ENABLE_EXT                  :: 1000267007;
+    DEPTH_COMPARE_OP_EXT                    :: 1000267008;
+    DEPTH_BOUNDS_TEST_ENABLE_EXT            :: 1000267009;
+    STENCIL_TEST_ENABLE_EXT                 :: 1000267010;
+    STENCIL_OP_EXT                          :: 1000267011;
+    RASTERIZER_DISCARD_ENABLE_EXT           :: 1000377001;
+    DEPTH_BIAS_ENABLE_EXT                   :: 1000377002;
+    PRIMITIVE_RESTART_ENABLE_EXT            :: 1000377004;
+    LINE_STIPPLE_KHR                        :: 1000259000;
+    MAX_ENUM                                :: 2147483647;
+}
+
 make_version :: (major: u32, minor: u32, patch: u32) -> u32 {
     return (major << 22) | (minor << 12) | patch;
 }
@@ -3153,21 +3764,98 @@ destroy_shader_module :: (
     pAllocator:   *Allocation_Callbacks = null,
 ) -> void #foreign libvulkan "vkDestroyShaderModule";
 
+create_pipeline_layout :: inline (
+    device:        Device,
+    p_create_info: *Pipeline_Layout_Create_Info,
+    p_allocator:   *Allocation_Callbacks = null,
+) -> Result, Pipeline_Layout {
+    pipeline_layout: Pipeline_Layout = ---;
+
+    result := vkCreatePipelineLayout(
+        device,
+        p_create_info,
+        p_allocator,
+        *pipeline_layout,
+    );
+
+    return result, pipeline_layout;
+}
+
+destroy_pipeline :: (
+    device:      Device,
+    pipeline:    Pipeline,
+    p_allocator: *Allocation_Callbacks = null,
+) -> void #foreign libvulkan "vkDestroyPipeline";
+
+destroy_pipeline_layout :: (
+    device: Device,
+    pipeline_layout: Pipeline_Layout,
+    p_allocator: *Allocation_Callbacks = null,
+) -> void #foreign libvulkan "vkDestroyPipelineLayout";
+
+create_graphics_pipelines :: inline (
+    device:         Device,
+    pipeline_cache: Pipeline_Cache,
+    p_create_infos: []Graphics_Pipeline_Create_Info,
+    p_allocator:    *Allocation_Callbacks = null,
+) -> Result, [..]Pipeline {
+    pipelines: [..]Pipeline;
+    array_resize(*pipelines, p_create_infos.count);
+
+    result := vkCreateGraphicsPipelines(
+        device,
+        pipeline_cache,
+        p_create_infos.count,
+        p_create_infos.data,
+        p_allocator,
+        pipelines.data,
+    );
+
+    return result, pipelines;
+}
+
+
+create_graphics_pipeline :: inline (
+    device:         Device,
+    pipeline_cache: Pipeline_Cache,
+    p_create_info:  *Graphics_Pipeline_Create_Info,
+    p_allocator:    *Allocation_Callbacks = null,
+) -> Result, Pipeline {
+    pipeline: Pipeline = ---;
+
+    result := vkCreateGraphicsPipelines(
+        device,
+        pipeline_cache,
+        1,
+        p_create_info,
+        p_allocator,
+        *pipeline,
+    );
+
+    return result, pipeline;
+}
+
 
 
 #scope_file
 
-Instance_T        :: struct {};
-Surface_Khr_T     :: struct {};
-Physical_Device_T :: struct {};
-Device_T          :: struct {};
-Queue_T           :: struct {};
-Device_Memory_T   :: struct {};
-Swapchain_Khr_T   :: struct {};
-Image_T           :: struct {};
-Image_View_T      :: struct {};
-Semaphore_T       :: struct {};
-Shader_Module_T   :: struct {};
+Instance_T              :: struct {}
+Surface_Khr_T           :: struct {}
+Physical_Device_T       :: struct {}
+Device_T                :: struct {}
+Queue_T                 :: struct {}
+Device_Memory_T         :: struct {}
+Swapchain_Khr_T         :: struct {}
+Image_T                 :: struct {}
+Image_View_T            :: struct {}
+Semaphore_T             :: struct {}
+Shader_Module_T         :: struct {}
+Descriptor_Set_Layout_T :: struct {}
+Pipeline_T              :: struct {}
+Pipeline_Layout_T       :: struct {}
+Sample_Mask_T           :: struct {}
+Render_Pass_T           :: struct {}
+Pipeline_Cache_T        :: struct {};
 
 vkCreateInstance :: (
     p_create_info: *Instance_Create_Info,
@@ -3260,6 +3948,22 @@ vkCreateShaderModule :: (
     p_create_info:   *Shader_Module_Create_Info,
     p_allocator:     *Allocation_Callbacks,
     p_shader_module: *Shader_Module,
+) -> Result #foreign libvulkan;
+
+vkCreatePipelineLayout :: (
+    device:            Device,
+    p_create_info:     *Pipeline_Layout_Create_Info,
+    p_allocator:       *Allocation_Callbacks,
+    p_pipeline_layout: *Pipeline_Layout,
+) -> Result #foreign libvulkan;
+
+vkCreateGraphicsPipelines :: (
+    device:            Device,
+    pipeline_cache:    Pipeline_Cache,
+    create_info_count: u32,
+    p_create_infos:    *Graphics_Pipeline_Create_Info,
+    p_allocator:       *Allocation_Callbacks,
+    p_pipelines:       *Pipeline,
 ) -> Result #foreign libvulkan;
 
 #if OS == {

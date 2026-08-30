@@ -19,8 +19,7 @@ Renderer :: struct {
 
     allocator: VMA.Allocator;
 
-    vert_shader: VK.Shader_Module;
-    frag_shader: VK.Shader_Module;
+    graphics_pipeline: Graphics_Pipeline;
 }
 
 Swapchain :: struct {
@@ -40,6 +39,11 @@ Depth :: struct {
     allocation: VMA.Allocation;
 
     IMAGE_FORMAT     :: VK.Format.D32_SFLOAT;
+}
+
+Graphics_Pipeline :: struct {
+    layout:   VK.Pipeline_Layout;
+    pipeline: VK.Pipeline;
 }
 
 init :: (
@@ -70,16 +74,14 @@ init :: (
 
     renderer.depth = create_depth_image(renderer.device, renderer.allocator, renderer.swapchain.config);
 
-    exe_path := path_strip_filename(get_path_of_running_executable());
-    renderer.vert_shader = create_shader_module(renderer.device, tprint("%shaders/vertex.spv", exe_path));
-    renderer.frag_shader = create_shader_module(renderer.device, tprint("%shaders/fragment.spv", exe_path));
+    renderer.graphics_pipeline = create_graphics_pipeline(renderer.device, renderer.swapchain);
 
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
-    VK.destroy_shader_module(renderer.device, renderer.vert_shader);
-    VK.destroy_shader_module(renderer.device, renderer.frag_shader);
+    VK.destroy_pipeline(renderer.device, renderer.graphics_pipeline.pipeline);
+    VK.destroy_pipeline_layout(renderer.device, renderer.graphics_pipeline.layout);
 
     destroy_depth(renderer.device, renderer.allocator, *renderer.depth);
 
@@ -101,6 +103,116 @@ deinit :: (renderer: *Renderer) {
 #scope_file
 
 VULKAN_API_VERSION :: #run VK.make_version(1, 4, 350);
+
+create_graphics_pipeline :: (device: VK.Device, swapchain: Swapchain) -> Graphics_Pipeline {
+    graphics_pipeline: Graphics_Pipeline;
+
+    {
+        pipeline_layout_create_info := VK.Pipeline_Layout_Create_Info.{
+            set_layout_count          = 0,
+            push_constant_range_count = 0,
+        };
+
+        result:, graphics_pipeline.layout = VK.create_pipeline_layout(device, *pipeline_layout_create_info);
+        assert(result == .SUCCESS);
+    }
+
+    exe_path := path_strip_filename(get_path_of_running_executable());
+    vertex_shader   := create_shader_module(device, tprint("%shaders/vertex.spv", exe_path));
+    fragment_shader := create_shader_module(device, tprint("%shaders/fragment.spv", exe_path));
+    defer VK.destroy_shader_module(device, vertex_shader);
+    defer VK.destroy_shader_module(device, fragment_shader);
+
+    ENTRY_POINT_NAME :: "main";
+    shader_stage_create_infos := VK.Pipeline_Shader_Stage_Create_Info.[
+        {
+            stage = .VERTEX,
+            module = vertex_shader,
+            p_name = ENTRY_POINT_NAME
+        },
+        {
+            stage = .FRAGMENT,
+            module = fragment_shader,
+            p_name = ENTRY_POINT_NAME,
+        },
+    ];
+
+    vertex_input_state_create_info: VK.Pipeline_Vertex_Input_State_Create_Info;
+
+    input_assembly_state_create_info := VK.Pipeline_Input_Assembly_State_Create_Info.{
+        topology = .TRIANGLE_LIST,
+    };
+
+    depth_stencil_state_create_info := VK.Pipeline_Depth_Stencil_State_Create_Info.{
+        depth_test_enable   = VK.TRUE,
+        depth_write_enable  = VK.TRUE,
+        depth_compare_op    = .LESS,
+        stencil_test_enable = VK.FALSE,
+    };
+
+    viewport_state_create_info := VK.Pipeline_Viewport_State_Create_Info.{
+        viewport_count = 1,
+        scissor_count  = 1,
+    };
+
+    rasterization_state_create_info := VK.Pipeline_Rasterization_State_Create_Info.{
+        polygon_mode = .FILL,
+        cull_mode    = .BACK,
+        front_face   = .COUNTER_CLOCKWISE,
+        line_width   = 1,
+    };
+
+    multisample_state_create_info := VK.Pipeline_Multisample_State_Create_Info.{
+        rasterization_samples = ._1,
+    };
+
+    color_blend_attachment_state := VK.Pipeline_Color_Blend_Attachment_State.{
+        blend_enable = VK.FALSE,
+        color_write_mask = .R | .G | .B | .A,
+    };
+
+    color_blend_state_create_info := VK.Pipeline_Color_Blend_State_Create_Info.{
+        attachment_count = 1,
+        p_attachments    = *color_blend_attachment_state,
+    };
+
+    dynamic_states := VK.Dynamic_State.[
+        .VIEWPORT,
+        .SCISSOR,
+    ];
+
+    dynamic_state_create_info := VK.Pipeline_Dynamic_State_Create_Info.{
+        dynamic_state_count = dynamic_states.count,
+        p_dynamic_states    = dynamic_states.data,
+    };
+
+    rendering_create_info := VK.Pipeline_Rendering_Create_Info.{
+        color_attachment_count     = 1,
+        p_color_attachment_formats = *swapchain.config.image_format,
+        depth_attachment_format    = Depth.IMAGE_FORMAT,
+    };
+
+    pipeline_create_info := VK.Graphics_Pipeline_Create_Info.{
+        p_next                 = *rendering_create_info,
+        stage_count            = shader_stage_create_infos.count,
+        p_stages               = shader_stage_create_infos.data,
+        p_vertex_input_state   = *vertex_input_state_create_info,
+        p_input_assembly_state = *input_assembly_state_create_info,
+        p_viewport_state       = *viewport_state_create_info,
+        p_rasterization_state  = *rasterization_state_create_info,
+        p_multisample_state    = *multisample_state_create_info,
+        p_depth_stencil_state  = *depth_stencil_state_create_info,
+        p_color_blend_state    = *color_blend_state_create_info,
+        p_dynamic_state        = *dynamic_state_create_info,
+        layout                 = graphics_pipeline.layout,
+        render_pass            = null,
+    };
+
+    result:, graphics_pipeline.pipeline = VK.create_graphics_pipeline(device, null, *pipeline_create_info);
+    assert(result == .SUCCESS);
+
+    return graphics_pipeline;
+}
 
 create_shader_module :: (device: VK.Device, path: string) -> VK.Shader_Module {
     File :: #import "File";
@@ -206,8 +318,8 @@ create_render_complete_semaphores :: (device: VK.Device, swapchain_images: []VK.
     return semaphores;
 }
 
-get_swapchain_images :: (device: VK.Device, swapchain: VK.Swapchain_Khr) -> [..]VK.Image, [..]VK.Image_View {
-     result, images := VK.get_swapchain_images_khr(device, swapchain);
+get_swapchain_images :: (device: VK.Device, swapchain: Swapchain) -> [..]VK.Image, [..]VK.Image_View {
+     result, images := VK.get_swapchain_images_khr(device, swapchain.swapchain);
      assert(result == .SUCCESS);
 
      image_views: [..]VK.Image_View;
@@ -215,7 +327,7 @@ get_swapchain_images :: (device: VK.Device, swapchain: VK.Swapchain_Khr) -> [..]
          image_view_create_info := VK.Image_View_Create_Info.{
              image             = image,
              view_type         = ._2D,
-             format            = Swapchain.IMAGE_FORMAT, // We check the format is supported prior to this call - in find_physical_device
+             format            = swapchain.config.image_format,
              subresource_range = {
                  aspect_mask      = .COLOR,
                  base_mip_level   = 0,
@@ -280,7 +392,7 @@ create_swapchain :: (
     assert(result == .SUCCESS);
 
     swapchain.images,
-    swapchain.views = get_swapchain_images(device, swapchain.swapchain);
+    swapchain.views = get_swapchain_images(device, swapchain);
 
     swapchain.render_complete_semaphores = create_render_complete_semaphores(device, swapchain.images);
 
