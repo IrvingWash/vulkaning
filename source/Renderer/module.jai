@@ -8,10 +8,15 @@ Renderer :: struct {
     instance:             VK.Instance;
     surface:              VK.Surface_Khr;
     physical_device:      VK.Physical_Device;
+
     graphics_queue_index: int;
     device:               VK.Device;
     graphics_queue:       VK.Queue;
-    swapchain:            VK.Swapchain_Khr;
+
+    swapchain:             VK.Swapchain_Khr;
+    swapchain_config:      VK.Swapchain_Create_Info_Khr;
+    swapchain_images:      [..]VK.Image;
+    swapchain_image_views: [..]VK.Image_View;
 
     allocator: VMA.Allocator;
 }
@@ -33,7 +38,7 @@ init :: (
 
     renderer.allocator = init_vma(renderer);
 
-    renderer.swapchain = create_swapchain(
+    renderer.swapchain, renderer.swapchain_config = create_swapchain(
         renderer.physical_device,
         renderer.surface,
         renderer.device,
@@ -41,10 +46,18 @@ init :: (
         get_window_pixel_size,
     );
 
+    renderer.swapchain_images, renderer.swapchain_image_views = get_swapchain_images(renderer.device, renderer.swapchain);
+
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
+    for image_view: renderer.swapchain_image_views {
+        VK.destroy_image_view(renderer.device, image_view);
+    }
+    array_free(renderer.swapchain_image_views);
+    array_free(renderer.swapchain_images);
+
     VMA.destroy_allocator(renderer.allocator);
 
     VK.destroy_swapchain_khr(renderer.device, renderer.swapchain);
@@ -65,13 +78,41 @@ VULKAN_API_VERSION :: #run VK.make_version(1, 4, 350);
 SWAPCHAIN_IMAGES_COUNT :: 2;
 SWAPCHAIN_IMAGE_FORMAT :: VK.Format.B8G8R8A8_SRGB;
 
+get_swapchain_images :: (device: VK.Device, swapchain: VK.Swapchain_Khr) -> [..]VK.Image, [..]VK.Image_View {
+     result, images := VK.get_swapchain_images_khr(device, swapchain);
+     assert(result == .SUCCESS);
+
+     image_views: [..]VK.Image_View;
+     for image: images {
+         image_view_create_info := VK.Image_View_Create_Info.{
+             image             = image,
+             view_type         = ._2D,
+             format            = SWAPCHAIN_IMAGE_FORMAT, // We check the format is supported prior to this call - in find_physical_device
+             subresource_range = {
+                 aspect_mask      = .COLOR,
+                 base_mip_level   = 0,
+                 level_count      = 1,
+                 base_array_layer = 0,
+                 layer_count      = 1,
+             },
+         };
+
+          result, image_view := VK.create_image_view(device, *image_view_create_info);
+          assert(result == .SUCCESS);
+
+          array_add(*image_views, image_view);
+     }
+
+     return images, image_views;
+}
+
 create_swapchain :: (
     physical_device:       VK.Physical_Device,
     surface:               VK.Surface_Khr,
     device:                VK.Device,
     window:                *Window_Type,
     get_window_pixel_size: Window_Pixel_Size_Getter,
-) -> VK.Swapchain_Khr {
+) -> VK.Swapchain_Khr, VK.Swapchain_Create_Info_Khr {
     result, surface_capabilities := VK.get_physical_device_surface_capabilities_khr(physical_device, surface);
     assert(result == .SUCCESS);
 
@@ -105,7 +146,7 @@ create_swapchain :: (
     result =, swapchain := VK.create_swapchain_khr(device, *swapchain_create_info);
     assert(result == .SUCCESS);
 
-    return swapchain;
+    return swapchain, swapchain_create_info;
 }
 
 init_vma :: (renderer: Renderer) -> VMA.Allocator {

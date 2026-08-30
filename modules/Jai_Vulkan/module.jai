@@ -5,6 +5,8 @@ Device          :: #type *Device_T;
 Queue           :: #type *Queue_T;
 Device_Memory   :: #type *Device_Memory_T;
 Swapchain_Khr   :: #type *Swapchain_Khr_T;
+Image           :: #type *Image_T;
+Image_View      :: #type *Image_View_T;
 
 Bool :: #type,isa u32;
 TRUE:  Bool : 1;
@@ -512,6 +514,43 @@ Surface_Format_Khr :: struct {
     color_space: Color_Space_Khr;
 }
 
+Image_View_Create_Info :: struct {
+    s_type :=          Structure_Type.IMAGE_VIEW_CREATE_INFO;
+    p_next:            *void;
+    flags:             Image_View_Create_Flags;
+    image:             Image;
+    view_type:         Image_View_Type;
+    format:            Format;
+    components:        Component_Mapping;
+    subresource_range: Image_Subresource_Range;
+}
+
+Image_Subresource_Range :: struct {
+    aspect_mask:      Image_Aspect_Flags;
+    base_mip_level:   u32;
+    level_count:      u32;
+    base_array_layer: u32;
+    layer_count:      u32;
+}
+
+Component_Mapping :: struct {
+    r: Component_Swizzle;
+    g: Component_Swizzle;
+    b: Component_Swizzle;
+    a: Component_Swizzle;
+}
+
+Component_Swizzle :: enum u32 {
+    IDENTITY :: 0;
+    ZERO     :: 1;
+    ONE      :: 2;
+    R        :: 3;
+    G        :: 4;
+    B        :: 5;
+    A        :: 6;
+    MAX_ENUM :: 2147483647;
+}
+
 Device_Queue_Create_Flags :: enum_flags u32 {
     PROTECTED                   :: 1;
     INTERNALLY_SYNCHRONIZED_KHR :: 4;
@@ -629,6 +668,33 @@ Swapchain_Create_Flags_Khr :: enum_flags u32 {
     DEFERRED_MEMORY_ALLOCATION_KHR  :: 8;
     DEFERRED_MEMORY_ALLOCATION_EXT  :: 8;
     FLAG_BITS_MAX_ENUM_KHR          :: 2147483647;
+}
+
+Image_View_Create_Flags :: enum_flags u32 {
+    FRAGMENT_DENSITY_MAP_DYNAMIC_EXT     :: 1;
+    DESCRIPTOR_BUFFER_CAPTURE_REPLAY_EXT :: 4;
+    FRAGMENT_DENSITY_MAP_DEFERRED_EXT    :: 2;
+    FLAG_BITS_MAX_ENUM                   :: 2147483647;
+}
+
+Image_Aspect_Flags :: enum_flags u32 {
+    COLOR              :: 1;
+    DEPTH              :: 2;
+    STENCIL            :: 4;
+    METADATA           :: 8;
+    PLANE_0            :: 16;
+    PLANE_1            :: 32;
+    PLANE_2            :: 64;
+    NONE                   :: 0;
+    MEMORY_PLANE_0_EXT :: 128;
+    MEMORY_PLANE_1_EXT :: 256;
+    MEMORY_PLANE_2_EXT :: 512;
+    MEMORY_PLANE_3_EXT :: 1024;
+    PLANE_0_KHR        :: 16;
+    PLANE_1_KHR        :: 32;
+    PLANE_2_KHR        :: 64;
+    NONE_KHR               :: 0;
+    FLAG_BITS_MAX_ENUM     :: 2147483647;
 }
 
 Structure_Type :: enum u32 {
@@ -2653,6 +2719,17 @@ Color_Space_Khr :: enum u32 {
     MAX_ENUM_KHR                  :: 2147483647;
 }
 
+Image_View_Type :: enum u32 {
+    _1D        :: 0;
+    _2D        :: 1;
+    _3D        :: 2;
+    CUBE       :: 3;
+    _1D_ARRAY  :: 4;
+    _2D_ARRAY  :: 5;
+    CUBE_ARRAY :: 6;
+    MAX_ENUM   :: 2147483647;
+}
+
 make_version :: (major: u32, minor: u32, patch: u32) -> u32 {
     return (major << 22) | (minor << 12) | patch;
 }
@@ -2830,6 +2907,62 @@ destroy_swapchain_khr :: (
     p_allocator: *Allocation_Callbacks = null,
 ) -> void #foreign libvulkan "vkDestroySwapchainKHR";
 
+get_swapchain_images_khr :: (device: Device, swapchain: Swapchain_Khr) -> Result, [..]Image {
+    images: [..]Image;
+
+    count: u32;
+
+    result := vkGetSwapchainImagesKHR(
+        device,
+        swapchain,
+        *count,
+        null,
+    );
+    if result != .SUCCESS {
+        return result, images;
+    }
+
+    array_resize(*images, count);
+
+    result = vkGetSwapchainImagesKHR(
+        device,
+        swapchain,
+        *count,
+        images.data,
+    );
+
+    return result, images;
+}
+
+create_image_view :: inline (
+    device:        Device,
+    p_create_info: *Image_View_Create_Info,
+    p_allocator:   *Allocation_Callbacks = null,
+) -> Result, Image_View {
+    view: Image_View = ---;
+
+    result := vkCreateImageView(
+        device,
+        p_create_info,
+        p_allocator,
+        *view,
+    );
+
+    return result, view;
+}
+
+destroy_image :: (
+    device:      Device,
+    image:       Image,
+    p_allocator: *Allocation_Callbacks = null,
+) -> void #foreign libvulkan "vkDestroyImage";
+
+destroy_image_view :: (
+    device:      Device,
+    image_view:  Image_View,
+    p_allocator: *Allocation_Callbacks = null,
+) -> void #foreign libvulkan "vkDestroyImageView";
+
 
 
 #scope_file
@@ -2841,6 +2974,8 @@ Device_T          :: struct {};
 Queue_T           :: struct {};
 Device_Memory_T   :: struct {};
 Swapchain_Khr_T   :: struct {};
+Image_T           :: struct {};
+Image_View_T      :: struct {};
 
 vkCreateInstance :: (
     p_create_info: *Instance_Create_Info,
@@ -2905,6 +3040,20 @@ vkCreateSwapchainKHR :: (
     p_create_info: *Swapchain_Create_Info_Khr,
     p_allocator:   *Allocation_Callbacks,
     p_swapchain:   *Swapchain_Khr,
+) -> Result #foreign libvulkan;
+
+vkGetSwapchainImagesKHR :: (
+    device:                  Device,
+    swapchain:               Swapchain_Khr,
+    p_swapchain_image_count: *u32,
+    p_swapchain_images:      *Image,
+) -> Result #foreign libvulkan;
+
+vkCreateImageView :: (
+    device: Device,
+    p_create_info: *Image_View_Create_Info,
+    p_allocator: *Allocation_Callbacks,
+    p_view: *Image_View,
 ) -> Result #foreign libvulkan;
 
 #if OS == {
