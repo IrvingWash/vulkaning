@@ -7,6 +7,7 @@ Device_Memory   :: #type *Device_Memory_T;
 Swapchain_Khr   :: #type *Swapchain_Khr_T;
 Image           :: #type *Image_T;
 Image_View      :: #type *Image_View_T;
+Semaphore       :: #type *Semaphore_T;
 
 Bool :: #type,isa u32;
 TRUE:  Bool : 1;
@@ -540,6 +541,12 @@ Component_Mapping :: struct {
     a: Component_Swizzle;
 }
 
+Semaphore_Create_Info :: struct {
+    s_type := Structure_Type.SEMAPHORE_CREATE_INFO;
+    p_next:   *void;
+    flags:    Semaphore_Create_Flags;
+}
+
 Component_Swizzle :: enum u32 {
     IDENTITY :: 0;
     ZERO     :: 1;
@@ -696,6 +703,8 @@ Image_Aspect_Flags :: enum_flags u32 {
     NONE_KHR               :: 0;
     FLAG_BITS_MAX_ENUM     :: 2147483647;
 }
+
+Semaphore_Create_Flags :: enum_flags u32 {}
 
 Structure_Type :: enum u32 {
     APPLICATION_INFO                                                       :: 0;
@@ -2963,6 +2972,29 @@ destroy_image_view :: (
     p_allocator: *Allocation_Callbacks = null,
 ) -> void #foreign libvulkan "vkDestroyImageView";
 
+destroy_semaphore :: (
+    device:     Device,
+    semaphore:  Semaphore,
+    pAllocator: *Allocation_Callbacks = null,
+) -> void #foreign libvulkan "vkDestroySemaphore";
+
+create_semaphore :: inline (
+    device:        Device,
+    p_create_info: *Semaphore_Create_Info,
+    p_allocator:   *Allocation_Callbacks = null,
+) -> Result, Semaphore {
+    semaphore: Semaphore = ---;
+
+    result := vkCreateSemaphore(
+        device,
+        p_create_info,
+        p_allocator,
+        *semaphore,
+    );
+
+    return result, semaphore;
+}
+
 
 
 #scope_file
@@ -2976,6 +3008,7 @@ Device_Memory_T   :: struct {};
 Swapchain_Khr_T   :: struct {};
 Image_T           :: struct {};
 Image_View_T      :: struct {};
+Semaphore_T       :: struct {};
 
 vkCreateInstance :: (
     p_create_info: *Instance_Create_Info,
@@ -3054,6 +3087,13 @@ vkCreateImageView :: (
     p_create_info: *Image_View_Create_Info,
     p_allocator: *Allocation_Callbacks,
     p_view: *Image_View,
+) -> Result #foreign libvulkan;
+
+vkCreateSemaphore :: (
+    device:        Device,
+    p_create_info: *Semaphore_Create_Info,
+    p_allocator:   *Allocation_Callbacks,
+    p_semaphore:   *Semaphore
 ) -> Result #foreign libvulkan;
 
 #if OS == {

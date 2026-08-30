@@ -18,6 +18,8 @@ Renderer :: struct {
     swapchain_images:      [..]VK.Image;
     swapchain_image_views: [..]VK.Image_View;
 
+    render_complete_semaphores: [..]VK.Semaphore;
+
     allocator: VMA.Allocator;
 }
 
@@ -38,7 +40,8 @@ init :: (
 
     renderer.allocator = init_vma(renderer);
 
-    renderer.swapchain, renderer.swapchain_config = create_swapchain(
+    renderer.swapchain,
+    renderer.swapchain_config = create_swapchain(
         renderer.physical_device,
         renderer.surface,
         renderer.device,
@@ -46,12 +49,20 @@ init :: (
         get_window_pixel_size,
     );
 
-    renderer.swapchain_images, renderer.swapchain_image_views = get_swapchain_images(renderer.device, renderer.swapchain);
+    renderer.swapchain_images,
+    renderer.swapchain_image_views = get_swapchain_images(renderer.device, renderer.swapchain);
+
+    renderer.render_complete_semaphores = create_render_complete_semaphores(renderer.device, renderer.swapchain_images);
 
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
+    for renderer.render_complete_semaphores {
+        VK.destroy_semaphore(renderer.device, it);
+    }
+    array_free(renderer.render_complete_semaphores);
+
     for image_view: renderer.swapchain_image_views {
         VK.destroy_image_view(renderer.device, image_view);
     }
@@ -75,8 +86,21 @@ deinit :: (renderer: *Renderer) {
 
 VULKAN_API_VERSION :: #run VK.make_version(1, 4, 350);
 
-SWAPCHAIN_IMAGES_COUNT :: 2;
 SWAPCHAIN_IMAGE_FORMAT :: VK.Format.B8G8R8A8_SRGB;
+
+create_render_complete_semaphores :: (device: VK.Device, swapchain_images: []VK.Image) -> [..]VK.Semaphore {
+    semaphores: [..]VK.Semaphore;
+    array_resize(*semaphores, swapchain_images.count);
+
+    for *semaphore: semaphores {
+        create_info: VK.Semaphore_Create_Info;
+
+        result:, semaphore.* = VK.create_semaphore(device, *create_info);
+        assert(result == .SUCCESS);
+    }
+
+    return semaphores;
+}
 
 get_swapchain_images :: (device: VK.Device, swapchain: VK.Swapchain_Khr) -> [..]VK.Image, [..]VK.Image_View {
      result, images := VK.get_swapchain_images_khr(device, swapchain);
@@ -116,6 +140,7 @@ create_swapchain :: (
     result, surface_capabilities := VK.get_physical_device_surface_capabilities_khr(physical_device, surface);
     assert(result == .SUCCESS);
 
+    SWAPCHAIN_IMAGES_COUNT :: 2;
     image_count_to_request := max(SWAPCHAIN_IMAGES_COUNT, surface_capabilities.min_image_count);
     if surface_capabilities.max_image_count > 0 {
         image_count_to_request = min(image_count_to_request, surface_capabilities.max_image_count);
