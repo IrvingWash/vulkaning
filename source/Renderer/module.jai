@@ -27,12 +27,16 @@ Swapchain :: struct {
     views:     [..]VK.Image_View;
 
     render_complete_semaphores: [..]VK.Semaphore;
+
+    IMAGE_FORMAT :: VK.Format.B8G8R8A8_SRGB;
 }
 
 Depth :: struct {
     image:      VK.Image;
     view:       VK.Image_View;
     allocation: VMA.Allocation;
+
+    IMAGE_FORMAT     :: VK.Format.D32_SFLOAT;
 }
 
 init :: (
@@ -69,9 +73,9 @@ init :: (
 deinit :: (renderer: *Renderer) {
     destroy_depth(renderer.device, renderer.allocator, *renderer.depth);
 
-    VMA.destroy_allocator(renderer.allocator);
-
     destroy_swapchain(renderer.device, *renderer.swapchain);
+
+    VMA.destroy_allocator(renderer.allocator);
 
     VK.destroy_surface_khr(renderer.instance, renderer.surface);
 
@@ -85,9 +89,6 @@ deinit :: (renderer: *Renderer) {
 #scope_file
 
 VULKAN_API_VERSION :: #run VK.make_version(1, 4, 350);
-
-SWAPCHAIN_IMAGE_FORMAT :: VK.Format.B8G8R8A8_SRGB;
-DEPTH_IMAGE_FORMAT     :: VK.Format.D32_SFLOAT;
 
 destroy_depth :: (device: VK.Device, allocator: VMA.Allocator, depth: *Depth) {
     VK.destroy_image_view(device, depth.view);
@@ -122,7 +123,7 @@ create_depth_image :: (
 
     image_create_info := VK.Image_Create_Info.{
         image_type = ._2D,
-        format     = DEPTH_IMAGE_FORMAT,
+        format     = Depth.IMAGE_FORMAT,
         extent     = {
             width  = swapchain_config.image_extent.width,
             height = swapchain_config.image_extent.height,
@@ -147,7 +148,7 @@ create_depth_image :: (
     image_view_create_info := VK.Image_View_Create_Info.{
         image             = depth.image,
         view_type         = ._2D,
-        format            = DEPTH_IMAGE_FORMAT,
+        format            = Depth.IMAGE_FORMAT,
         subresource_range = {
             aspect_mask = .DEPTH,
             level_count = 1,
@@ -184,7 +185,7 @@ get_swapchain_images :: (device: VK.Device, swapchain: VK.Swapchain_Khr) -> [..]
          image_view_create_info := VK.Image_View_Create_Info.{
              image             = image,
              view_type         = ._2D,
-             format            = SWAPCHAIN_IMAGE_FORMAT, // We check the format is supported prior to this call - in find_physical_device
+             format            = Swapchain.IMAGE_FORMAT, // We check the format is supported prior to this call - in find_physical_device
              subresource_range = {
                  aspect_mask      = .COLOR,
                  base_mip_level   = 0,
@@ -234,7 +235,7 @@ create_swapchain :: (
     swapchain.config = VK.Swapchain_Create_Info_Khr.{
         surface            = surface,
         min_image_count    = xx image_count_to_request,
-        image_format       = SWAPCHAIN_IMAGE_FORMAT, // We check if this format is supported earlier, when we look for the physical device
+        image_format       = Swapchain.IMAGE_FORMAT, // We check if this format is supported earlier, when we look for the physical device
         image_color_space  = .SRGB_NONLINEAR_KHR,
         image_extent       = image_extent,
         image_array_layers = 1,
@@ -374,7 +375,7 @@ find_physical_device :: (instance: VK.Instance, surface: VK.Surface_Khr) -> VK.P
 
         have_the_needed_format: bool;
         for format: surface_formats {
-            if format.format == SWAPCHAIN_IMAGE_FORMAT {
+            if format.format == Swapchain.IMAGE_FORMAT {
                 have_the_needed_format = true;
                 break;
             }
