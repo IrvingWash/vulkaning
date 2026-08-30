@@ -53,7 +53,7 @@ init :: (state: *State) {
     );
     assert(state.window != null, "Failed to create SDL Window");
 
-    state.renderer = Renderer.init(state.window, get_sdl_instance_extensions, SDL.vulkan_create_surface);
+    state.renderer = Renderer.init(state.window, get_sdl_instance_extensions, SDL.vulkan_create_surface, SDL.get_window_size_in_pixels);
 }
 
 deinit :: (state: *State) {

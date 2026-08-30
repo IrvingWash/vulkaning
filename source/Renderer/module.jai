@@ -2,6 +2,7 @@
 
 Additional_Instance_Extensions_Getter :: #type () -> [..]*u8;
 Surface_Creator :: #type (window: *Window_Type, instance: *void, allocator: *void = null) -> *void;
+Window_Pixel_Size_Getter :: #type (window: *Window_Type) -> width: s32, height: s32;
 
 Renderer :: struct {
     instance:             VK.Instance;
@@ -10,31 +11,43 @@ Renderer :: struct {
     graphics_queue_index: int;
     device:               VK.Device;
     graphics_queue:       VK.Queue;
+    swapchain:            VK.Swapchain_Khr;
 
     allocator: VMA.Allocator;
 }
 
 init :: (
-    window: *void,
+    window:                             *void,
     get_additional_instance_extensions: Additional_Instance_Extensions_Getter,
-    create_surface: Surface_Creator,
+    create_surface:                     Surface_Creator,
+    get_window_pixel_size:              Window_Pixel_Size_Getter,
 ) -> Renderer {
     renderer: Renderer;
 
     renderer.instance             = create_instance(get_additional_instance_extensions);
     renderer.surface              = create_surface(window, renderer.instance);
-    renderer.physical_device      = find_physical_device(renderer.instance);
+    renderer.physical_device      = find_physical_device(renderer.instance, renderer.surface);
     renderer.graphics_queue_index = find_graphics_queue_index(renderer.physical_device, renderer.surface);
     renderer.device               = create_device(renderer.physical_device, renderer.graphics_queue_index);
     renderer.graphics_queue       = VK.get_device_queue(renderer.device, xx renderer.graphics_queue_index, 0);
 
     renderer.allocator = init_vma(renderer);
 
+    renderer.swapchain = create_swapchain(
+        renderer.physical_device,
+        renderer.surface,
+        renderer.device,
+        window,
+        get_window_pixel_size,
+    );
+
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
     VMA.destroy_allocator(renderer.allocator);
+
+    VK.destroy_swapchain_khr(renderer.device, renderer.swapchain);
 
     VK.destroy_surface_khr(renderer.instance, renderer.surface);
 
@@ -48,6 +61,52 @@ deinit :: (renderer: *Renderer) {
 #scope_file
 
 VULKAN_API_VERSION :: #run VK.make_version(1, 4, 350);
+
+SWAPCHAIN_IMAGES_COUNT :: 2;
+SWAPCHAIN_IMAGE_FORMAT :: VK.Format.B8G8R8A8_SRGB;
+
+create_swapchain :: (
+    physical_device:       VK.Physical_Device,
+    surface:               VK.Surface_Khr,
+    device:                VK.Device,
+    window:                *Window_Type,
+    get_window_pixel_size: Window_Pixel_Size_Getter,
+) -> VK.Swapchain_Khr {
+    result, surface_capabilities := VK.get_physical_device_surface_capabilities_khr(physical_device, surface);
+    assert(result == .SUCCESS);
+
+    image_count_to_request := max(SWAPCHAIN_IMAGES_COUNT, surface_capabilities.min_image_count);
+    if surface_capabilities.max_image_count > 0 {
+        image_count_to_request = min(image_count_to_request, surface_capabilities.max_image_count);
+    }
+
+    image_extent: VK.Extent_2D;
+    if surface_capabilities.current_extent.width != U32_MAX {
+        image_extent = surface_capabilities.current_extent;
+    } else {
+        width, height := get_window_pixel_size(window);
+        image_extent.width = clamp(cast(u32, width), surface_capabilities.min_image_extent.width, surface_capabilities.max_image_extent.width);
+        image_extent.height = clamp(cast(u32, height), surface_capabilities.min_image_extent.height, surface_capabilities.max_image_extent.height);
+    }
+
+    swapchain_create_info := VK.Swapchain_Create_Info_Khr.{
+        surface            = surface,
+        min_image_count    = xx image_count_to_request,
+        image_format       = SWAPCHAIN_IMAGE_FORMAT, // We check if this format is supported earlier, when we look for the physical device
+        image_color_space  = .SRGB_NONLINEAR_KHR,
+        image_extent       = image_extent,
+        image_array_layers = 1,
+        image_usage        = .COLOR_ATTACHMENT,
+        pre_transform      = surface_capabilities.current_transform,
+        composite_alpha    = .OPAQUE_KHR,
+        present_mode       = .FIFO_KHR,
+    };
+
+    result =, swapchain := VK.create_swapchain_khr(device, *swapchain_create_info);
+    assert(result == .SUCCESS);
+
+    return swapchain;
+}
 
 init_vma :: (renderer: Renderer) -> VMA.Allocator {
     allocator_create_info := VMA.Allocator_Create_Info.{
@@ -147,7 +206,7 @@ find_graphics_queue_index :: (physical_device: VK.Physical_Device, surface: VK.S
     return the_index;
 }
 
-find_physical_device :: (instance: VK.Instance) -> VK.Physical_Device {
+find_physical_device :: (instance: VK.Instance, surface: VK.Surface_Khr) -> VK.Physical_Device {
     result, physical_devices := VK.enumerate_physical_devices(instance,, temp);
     assert(result == .SUCCESS);
 
@@ -159,6 +218,21 @@ find_physical_device :: (instance: VK.Instance) -> VK.Physical_Device {
             the_device = device;
             break;
         }
+    }
+
+    { // Check if the hardcoded swapchain image format is supported
+        result, surface_formats := VK.get_physical_device_surface_formats_khr(the_device, surface,, temp);
+        assert(result == .SUCCESS);
+
+        have_the_needed_format: bool;
+        for format: surface_formats {
+            if format.format == SWAPCHAIN_IMAGE_FORMAT {
+                have_the_needed_format = true;
+                break;
+            }
+        }
+
+        assert(have_the_needed_format);
     }
 
     assert(the_device != null);
@@ -230,5 +304,6 @@ on_debug_message: VK.Pfn_Debug_Utils_Messenger_Callback_Ext : (
 }
 
 #import "Basic";
+#import "Math";
 VK  :: #import "Jai_Vulkan";
 VMA :: #import "Vulkan_Memory_Allocator"(DEBUG = DEBUG);

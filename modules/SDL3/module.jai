@@ -996,6 +996,13 @@ create_window :: (title: *u8, w: s32, h: s32, flags: Window_Flags) -> *Window #f
 destroy_window :: (window: *Window) -> void #foreign libsdl3 "SDL_DestroyWindow";
 quit :: () -> void #foreign libsdl3 "SDL_Quit";
 
+get_window_size_in_pixels :: (window: *Window) -> width: s32, height: s32 {
+    w, h: s32;
+    ok := SDL_GetWindowSizeInPixels(window, *w, *h);
+
+    return w, h;
+}
+
 vulkan_get_instance_extensions :: (count: *u32) -> **u8 #foreign libsdl3 "SDL_Vulkan_GetInstanceExtensions";
 
 vulkan_create_surface :: (window: *Window, instance: *void, allocator: *void = null) -> *void {
@@ -1009,6 +1016,7 @@ vulkan_create_surface :: (window: *Window, instance: *void, allocator: *void = n
 #scope_file
 
 SDL_Vulkan_CreateSurface :: (window: *void, instance: *void, allocator: *void, surface: *void) -> bool #foreign libsdl3;
+SDL_GetWindowSizeInPixels :: (window: *Window, w: *s32, h: *s32) -> bool #foreign libsdl3;
 
 #if OS == {
     case .LINUX;

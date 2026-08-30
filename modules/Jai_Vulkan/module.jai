@@ -4,6 +4,7 @@ Physical_Device :: #type *Physical_Device_T;
 Device          :: #type *Device_T;
 Queue           :: #type *Queue_T;
 Device_Memory   :: #type *Device_Memory_T;
+Swapchain_Khr   :: #type *Swapchain_Khr_T;
 
 Bool :: #type,isa u32;
 TRUE:  Bool : 1;
@@ -472,6 +473,45 @@ Device_Create_Info :: struct {
     p_enabled_features:         *Physical_Device_Features;
 }
 
+Surface_Capabilities_Khr :: struct {
+    min_image_count:           u32;
+    max_image_count:           u32;
+    current_extent:            Extent_2D;
+    min_image_extent:          Extent_2D;
+    max_image_extent:          Extent_2D;
+    max_image_array_layers:    u32;
+    supported_transforms:      Surface_Transform_Flags_Khr;
+    current_transform:         Surface_Transform_Flags_Khr;
+    supported_composite_alpha: Composite_Alpha_Flags_Khr;
+    supported_usage_flags:     Image_Usage_Flags;
+}
+
+Swapchain_Create_Info_Khr :: struct {
+    s_type :=                 Structure_Type.SWAPCHAIN_CREATE_INFO_KHR;
+    p_next:                   *void;
+    flags:                    Swapchain_Create_Flags_Khr;
+    surface:                  Surface_Khr;
+    min_image_count:          u32;
+    image_format:             Format;
+    image_color_space:        Color_Space_Khr;
+    image_extent:             Extent_2D;
+    image_array_layers:       u32;
+    image_usage:              Image_Usage_Flags;
+    image_sharing_mode:       Sharing_Mode;
+    queue_family_index_count: u32;
+    p_queue_family_indices:   *u32;
+    pre_transform:            Surface_Transform_Flags_Khr;
+    composite_alpha:          Composite_Alpha_Flags_Khr;
+    present_mode:             Present_Mode_Khr;
+    clipped:                  Bool;
+    old_swapchain:            Swapchain_Khr;
+}
+
+Surface_Format_Khr :: struct {
+    format:      Format;
+    color_space: Color_Space_Khr;
+}
+
 Device_Queue_Create_Flags :: enum_flags u32 {
     PROTECTED                   :: 1;
     INTERNALLY_SYNCHRONIZED_KHR :: 4;
@@ -526,6 +566,70 @@ Queue_Flags :: enum_flags u32 {
 }
 
 Device_Create_Flags :: enum_flags u32 {}
+
+Surface_Transform_Flags_Khr :: enum_flags u32 {
+    IDENTITY_KHR                     :: 1;
+    ROTATE_90_KHR                    :: 2;
+    ROTATE_180_KHR                   :: 4;
+    ROTATE_270_KHR                   :: 8;
+    HORIZONTAL_MIRROR_KHR            :: 16;
+    HORIZONTAL_MIRROR_ROTATE_90_KHR  :: 32;
+    HORIZONTAL_MIRROR_ROTATE_180_KHR :: 64;
+    HORIZONTAL_MIRROR_ROTATE_270_KHR :: 128;
+    INHERIT_KHR                      :: 256;
+    FLAG_BITS_MAX_ENUM_KHR           :: 2147483647;
+}
+
+Image_Usage_Flags :: enum_flags u32 {
+    TRANSFER_SRC                            :: 1;
+    TRANSFER_DST                            :: 2;
+    SAMPLED                                 :: 4;
+    STORAGE                                 :: 8;
+    COLOR_ATTACHMENT                        :: 16;
+    DEPTH_STENCIL_ATTACHMENT                :: 32;
+    TRANSIENT_ATTACHMENT                    :: 64;
+    INPUT_ATTACHMENT                        :: 128;
+    HOST_TRANSFER                           :: 4194304;
+    VIDEO_DECODE_DST_KHR                    :: 1024;
+    VIDEO_DECODE_SRC_KHR                    :: 2048;
+    VIDEO_DECODE_DPB_KHR                    :: 4096;
+    FRAGMENT_DENSITY_MAP_EXT                :: 512;
+    FRAGMENT_SHADING_RATE_ATTACHMENT_KHR    :: 256;
+    VIDEO_ENCODE_DST_KHR                    :: 8192;
+    VIDEO_ENCODE_SRC_KHR                    :: 16384;
+    VIDEO_ENCODE_DPB_KHR                    :: 32768;
+    ATTACHMENT_FEEDBACK_LOOP_EXT            :: 524288;
+    INVOCATION_MASK_HUAWEI                  :: 262144;
+    SAMPLE_WEIGHT_QCOM                      :: 1048576;
+    SAMPLE_BLOCK_MATCH_QCOM                 :: 2097152;
+    TENSOR_ALIASING_ARM                     :: 8388608;
+    TILE_MEMORY_QCOM                        :: 134217728;
+    VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_KHR :: 33554432;
+    VIDEO_ENCODE_EMPHASIS_MAP_KHR           :: 67108864;
+    SHADING_RATE_IMAGE_NV                   :: 256;
+    HOST_TRANSFER_EXT                       :: 4194304;
+    FLAG_BITS_MAX_ENUM                      :: 2147483647;
+}
+
+Composite_Alpha_Flags_Khr :: enum_flags u32 {
+    OPAQUE_KHR          :: 1;
+    PRE_MULTIPLIED_KHR  :: 2;
+    POST_MULTIPLIED_KHR :: 4;
+    INHERIT_KHR         :: 8;
+    FLAG_BITS_MAX_ENUM_KHR  :: 2147483647;
+}
+
+Swapchain_Create_Flags_Khr :: enum_flags u32 {
+    SPLIT_INSTANCE_BIND_REGIONS_KHR :: 1;
+    PROTECTED_KHR                   :: 2;
+    MUTABLE_FORMAT_KHR              :: 4;
+    PRESENT_TIMING_EXT              :: 512;
+    PRESENT_ID_2_KHR                :: 64;
+    PRESENT_WAIT_2_KHR              :: 128;
+    DEFERRED_MEMORY_ALLOCATION_KHR  :: 8;
+    DEFERRED_MEMORY_ALLOCATION_EXT  :: 8;
+    FLAG_BITS_MAX_ENUM_KHR          :: 2147483647;
+}
 
 Structure_Type :: enum u32 {
     APPLICATION_INFO                                                       :: 0;
@@ -2146,6 +2250,409 @@ Physical_Device_Type :: enum u32 {
     MAX_ENUM       :: 2147483647;
 }
 
+Sharing_Mode :: enum u32 {
+    EXCLUSIVE  :: 0;
+    CONCURRENT :: 1;
+    MAX_ENUM   :: 2147483647;
+}
+
+Present_Mode_Khr :: enum u32 {
+    IMMEDIATE_KHR                 :: 0;
+    MAILBOX_KHR                   :: 1;
+    FIFO_KHR                      :: 2;
+    FIFO_RELAXED_KHR              :: 3;
+    SHARED_DEMAND_REFRESH_KHR     :: 1000111000;
+    SHARED_CONTINUOUS_REFRESH_KHR :: 1000111001;
+    FIFO_LATEST_READY_KHR         :: 1000361000;
+    FIFO_LATEST_READY_EXT         :: 1000361000;
+    MAX_ENUM_KHR                  :: 2147483647;
+}
+
+Format :: enum u32 {
+    UNDEFINED                                      :: 0;
+    R4G4_UNORM_PACK8                               :: 1;
+    R4G4B4A4_UNORM_PACK16                          :: 2;
+    B4G4R4A4_UNORM_PACK16                          :: 3;
+    R5G6B5_UNORM_PACK16                            :: 4;
+    B5G6R5_UNORM_PACK16                            :: 5;
+    R5G5B5A1_UNORM_PACK16                          :: 6;
+    B5G5R5A1_UNORM_PACK16                          :: 7;
+    A1R5G5B5_UNORM_PACK16                          :: 8;
+    R8_UNORM                                       :: 9;
+    R8_SNORM                                       :: 10;
+    R8_USCALED                                     :: 11;
+    R8_SSCALED                                     :: 12;
+    R8_UINT                                        :: 13;
+    R8_SINT                                        :: 14;
+    R8_SRGB                                        :: 15;
+    R8G8_UNORM                                     :: 16;
+    R8G8_SNORM                                     :: 17;
+    R8G8_USCALED                                   :: 18;
+    R8G8_SSCALED                                   :: 19;
+    R8G8_UINT                                      :: 20;
+    R8G8_SINT                                      :: 21;
+    R8G8_SRGB                                      :: 22;
+    R8G8B8_UNORM                                   :: 23;
+    R8G8B8_SNORM                                   :: 24;
+    R8G8B8_USCALED                                 :: 25;
+    R8G8B8_SSCALED                                 :: 26;
+    R8G8B8_UINT                                    :: 27;
+    R8G8B8_SINT                                    :: 28;
+    R8G8B8_SRGB                                    :: 29;
+    B8G8R8_UNORM                                   :: 30;
+    B8G8R8_SNORM                                   :: 31;
+    B8G8R8_USCALED                                 :: 32;
+    B8G8R8_SSCALED                                 :: 33;
+    B8G8R8_UINT                                    :: 34;
+    B8G8R8_SINT                                    :: 35;
+    B8G8R8_SRGB                                    :: 36;
+    R8G8B8A8_UNORM                                 :: 37;
+    R8G8B8A8_SNORM                                 :: 38;
+    R8G8B8A8_USCALED                               :: 39;
+    R8G8B8A8_SSCALED                               :: 40;
+    R8G8B8A8_UINT                                  :: 41;
+    R8G8B8A8_SINT                                  :: 42;
+    R8G8B8A8_SRGB                                  :: 43;
+    B8G8R8A8_UNORM                                 :: 44;
+    B8G8R8A8_SNORM                                 :: 45;
+    B8G8R8A8_USCALED                               :: 46;
+    B8G8R8A8_SSCALED                               :: 47;
+    B8G8R8A8_UINT                                  :: 48;
+    B8G8R8A8_SINT                                  :: 49;
+    B8G8R8A8_SRGB                                  :: 50;
+    A8B8G8R8_UNORM_PACK32                          :: 51;
+    A8B8G8R8_SNORM_PACK32                          :: 52;
+    A8B8G8R8_USCALED_PACK32                        :: 53;
+    A8B8G8R8_SSCALED_PACK32                        :: 54;
+    A8B8G8R8_UINT_PACK32                           :: 55;
+    A8B8G8R8_SINT_PACK32                           :: 56;
+    A8B8G8R8_SRGB_PACK32                           :: 57;
+    A2R10G10B10_UNORM_PACK32                       :: 58;
+    A2R10G10B10_SNORM_PACK32                       :: 59;
+    A2R10G10B10_USCALED_PACK32                     :: 60;
+    A2R10G10B10_SSCALED_PACK32                     :: 61;
+    A2R10G10B10_UINT_PACK32                        :: 62;
+    A2R10G10B10_SINT_PACK32                        :: 63;
+    A2B10G10R10_UNORM_PACK32                       :: 64;
+    A2B10G10R10_SNORM_PACK32                       :: 65;
+    A2B10G10R10_USCALED_PACK32                     :: 66;
+    A2B10G10R10_SSCALED_PACK32                     :: 67;
+    A2B10G10R10_UINT_PACK32                        :: 68;
+    A2B10G10R10_SINT_PACK32                        :: 69;
+    R16_UNORM                                      :: 70;
+    R16_SNORM                                      :: 71;
+    R16_USCALED                                    :: 72;
+    R16_SSCALED                                    :: 73;
+    R16_UINT                                       :: 74;
+    R16_SINT                                       :: 75;
+    R16_SFLOAT                                     :: 76;
+    R16G16_UNORM                                   :: 77;
+    R16G16_SNORM                                   :: 78;
+    R16G16_USCALED                                 :: 79;
+    R16G16_SSCALED                                 :: 80;
+    R16G16_UINT                                    :: 81;
+    R16G16_SINT                                    :: 82;
+    R16G16_SFLOAT                                  :: 83;
+    R16G16B16_UNORM                                :: 84;
+    R16G16B16_SNORM                                :: 85;
+    R16G16B16_USCALED                              :: 86;
+    R16G16B16_SSCALED                              :: 87;
+    R16G16B16_UINT                                 :: 88;
+    R16G16B16_SINT                                 :: 89;
+    R16G16B16_SFLOAT                               :: 90;
+    R16G16B16A16_UNORM                             :: 91;
+    R16G16B16A16_SNORM                             :: 92;
+    R16G16B16A16_USCALED                           :: 93;
+    R16G16B16A16_SSCALED                           :: 94;
+    R16G16B16A16_UINT                              :: 95;
+    R16G16B16A16_SINT                              :: 96;
+    R16G16B16A16_SFLOAT                            :: 97;
+    R32_UINT                                       :: 98;
+    R32_SINT                                       :: 99;
+    R32_SFLOAT                                     :: 100;
+    R32G32_UINT                                    :: 101;
+    R32G32_SINT                                    :: 102;
+    R32G32_SFLOAT                                  :: 103;
+    R32G32B32_UINT                                 :: 104;
+    R32G32B32_SINT                                 :: 105;
+    R32G32B32_SFLOAT                               :: 106;
+    R32G32B32A32_UINT                              :: 107;
+    R32G32B32A32_SINT                              :: 108;
+    R32G32B32A32_SFLOAT                            :: 109;
+    R64_UINT                                       :: 110;
+    R64_SINT                                       :: 111;
+    R64_SFLOAT                                     :: 112;
+    R64G64_UINT                                    :: 113;
+    R64G64_SINT                                    :: 114;
+    R64G64_SFLOAT                                  :: 115;
+    R64G64B64_UINT                                 :: 116;
+    R64G64B64_SINT                                 :: 117;
+    R64G64B64_SFLOAT                               :: 118;
+    R64G64B64A64_UINT                              :: 119;
+    R64G64B64A64_SINT                              :: 120;
+    R64G64B64A64_SFLOAT                            :: 121;
+    B10G11R11_UFLOAT_PACK32                        :: 122;
+    E5B9G9R9_UFLOAT_PACK32                         :: 123;
+    D16_UNORM                                      :: 124;
+    X8_D24_UNORM_PACK32                            :: 125;
+    D32_SFLOAT                                     :: 126;
+    S8_UINT                                        :: 127;
+    D16_UNORM_S8_UINT                              :: 128;
+    D24_UNORM_S8_UINT                              :: 129;
+    D32_SFLOAT_S8_UINT                             :: 130;
+    BC1_RGB_UNORM_BLOCK                            :: 131;
+    BC1_RGB_SRGB_BLOCK                             :: 132;
+    BC1_RGBA_UNORM_BLOCK                           :: 133;
+    BC1_RGBA_SRGB_BLOCK                            :: 134;
+    BC2_UNORM_BLOCK                                :: 135;
+    BC2_SRGB_BLOCK                                 :: 136;
+    BC3_UNORM_BLOCK                                :: 137;
+    BC3_SRGB_BLOCK                                 :: 138;
+    BC4_UNORM_BLOCK                                :: 139;
+    BC4_SNORM_BLOCK                                :: 140;
+    BC5_UNORM_BLOCK                                :: 141;
+    BC5_SNORM_BLOCK                                :: 142;
+    BC6H_UFLOAT_BLOCK                              :: 143;
+    BC6H_SFLOAT_BLOCK                              :: 144;
+    BC7_UNORM_BLOCK                                :: 145;
+    BC7_SRGB_BLOCK                                 :: 146;
+    ETC2_R8G8B8_UNORM_BLOCK                        :: 147;
+    ETC2_R8G8B8_SRGB_BLOCK                         :: 148;
+    ETC2_R8G8B8A1_UNORM_BLOCK                      :: 149;
+    ETC2_R8G8B8A1_SRGB_BLOCK                       :: 150;
+    ETC2_R8G8B8A8_UNORM_BLOCK                      :: 151;
+    ETC2_R8G8B8A8_SRGB_BLOCK                       :: 152;
+    EAC_R11_UNORM_BLOCK                            :: 153;
+    EAC_R11_SNORM_BLOCK                            :: 154;
+    EAC_R11G11_UNORM_BLOCK                         :: 155;
+    EAC_R11G11_SNORM_BLOCK                         :: 156;
+    ASTC_4x4_UNORM_BLOCK                           :: 157;
+    ASTC_4x4_SRGB_BLOCK                            :: 158;
+    ASTC_5x4_UNORM_BLOCK                           :: 159;
+    ASTC_5x4_SRGB_BLOCK                            :: 160;
+    ASTC_5x5_UNORM_BLOCK                           :: 161;
+    ASTC_5x5_SRGB_BLOCK                            :: 162;
+    ASTC_6x5_UNORM_BLOCK                           :: 163;
+    ASTC_6x5_SRGB_BLOCK                            :: 164;
+    ASTC_6x6_UNORM_BLOCK                           :: 165;
+    ASTC_6x6_SRGB_BLOCK                            :: 166;
+    ASTC_8x5_UNORM_BLOCK                           :: 167;
+    ASTC_8x5_SRGB_BLOCK                            :: 168;
+    ASTC_8x6_UNORM_BLOCK                           :: 169;
+    ASTC_8x6_SRGB_BLOCK                            :: 170;
+    ASTC_8x8_UNORM_BLOCK                           :: 171;
+    ASTC_8x8_SRGB_BLOCK                            :: 172;
+    ASTC_10x5_UNORM_BLOCK                          :: 173;
+    ASTC_10x5_SRGB_BLOCK                           :: 174;
+    ASTC_10x6_UNORM_BLOCK                          :: 175;
+    ASTC_10x6_SRGB_BLOCK                           :: 176;
+    ASTC_10x8_UNORM_BLOCK                          :: 177;
+    ASTC_10x8_SRGB_BLOCK                           :: 178;
+    ASTC_10x10_UNORM_BLOCK                         :: 179;
+    ASTC_10x10_SRGB_BLOCK                          :: 180;
+    ASTC_12x10_UNORM_BLOCK                         :: 181;
+    ASTC_12x10_SRGB_BLOCK                          :: 182;
+    ASTC_12x12_UNORM_BLOCK                         :: 183;
+    ASTC_12x12_SRGB_BLOCK                          :: 184;
+    G8B8G8R8_422_UNORM                             :: 1000156000;
+    B8G8R8G8_422_UNORM                             :: 1000156001;
+    G8_B8_R8_3PLANE_420_UNORM                      :: 1000156002;
+    G8_B8R8_2PLANE_420_UNORM                       :: 1000156003;
+    G8_B8_R8_3PLANE_422_UNORM                      :: 1000156004;
+    G8_B8R8_2PLANE_422_UNORM                       :: 1000156005;
+    G8_B8_R8_3PLANE_444_UNORM                      :: 1000156006;
+    R10X6_UNORM_PACK16                             :: 1000156007;
+    R10X6G10X6_UNORM_2PACK16                       :: 1000156008;
+    R10X6G10X6B10X6A10X6_UNORM_4PACK16             :: 1000156009;
+    G10X6B10X6G10X6R10X6_422_UNORM_4PACK16         :: 1000156010;
+    B10X6G10X6R10X6G10X6_422_UNORM_4PACK16         :: 1000156011;
+    G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16     :: 1000156012;
+    G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16      :: 1000156013;
+    G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16     :: 1000156014;
+    G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16      :: 1000156015;
+    G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16     :: 1000156016;
+    R12X4_UNORM_PACK16                             :: 1000156017;
+    R12X4G12X4_UNORM_2PACK16                       :: 1000156018;
+    R12X4G12X4B12X4A12X4_UNORM_4PACK16             :: 1000156019;
+    G12X4B12X4G12X4R12X4_422_UNORM_4PACK16         :: 1000156020;
+    B12X4G12X4R12X4G12X4_422_UNORM_4PACK16         :: 1000156021;
+    G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16     :: 1000156022;
+    G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16      :: 1000156023;
+    G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16     :: 1000156024;
+    G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16      :: 1000156025;
+    G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16     :: 1000156026;
+    G16B16G16R16_422_UNORM                         :: 1000156027;
+    B16G16R16G16_422_UNORM                         :: 1000156028;
+    G16_B16_R16_3PLANE_420_UNORM                   :: 1000156029;
+    G16_B16R16_2PLANE_420_UNORM                    :: 1000156030;
+    G16_B16_R16_3PLANE_422_UNORM                   :: 1000156031;
+    G16_B16R16_2PLANE_422_UNORM                    :: 1000156032;
+    G16_B16_R16_3PLANE_444_UNORM                   :: 1000156033;
+    G8_B8R8_2PLANE_444_UNORM                       :: 1000330000;
+    G10X6_B10X6R10X6_2PLANE_444_UNORM_3PACK16      :: 1000330001;
+    G12X4_B12X4R12X4_2PLANE_444_UNORM_3PACK16      :: 1000330002;
+    G16_B16R16_2PLANE_444_UNORM                    :: 1000330003;
+    A4R4G4B4_UNORM_PACK16                          :: 1000340000;
+    A4B4G4R4_UNORM_PACK16                          :: 1000340001;
+    ASTC_4x4_SFLOAT_BLOCK                          :: 1000066000;
+    ASTC_5x4_SFLOAT_BLOCK                          :: 1000066001;
+    ASTC_5x5_SFLOAT_BLOCK                          :: 1000066002;
+    ASTC_6x5_SFLOAT_BLOCK                          :: 1000066003;
+    ASTC_6x6_SFLOAT_BLOCK                          :: 1000066004;
+    ASTC_8x5_SFLOAT_BLOCK                          :: 1000066005;
+    ASTC_8x6_SFLOAT_BLOCK                          :: 1000066006;
+    ASTC_8x8_SFLOAT_BLOCK                          :: 1000066007;
+    ASTC_10x5_SFLOAT_BLOCK                         :: 1000066008;
+    ASTC_10x6_SFLOAT_BLOCK                         :: 1000066009;
+    ASTC_10x8_SFLOAT_BLOCK                         :: 1000066010;
+    ASTC_10x10_SFLOAT_BLOCK                        :: 1000066011;
+    ASTC_12x10_SFLOAT_BLOCK                        :: 1000066012;
+    ASTC_12x12_SFLOAT_BLOCK                        :: 1000066013;
+    A1B5G5R5_UNORM_PACK16                          :: 1000470000;
+    A8_UNORM                                       :: 1000470001;
+    PVRTC1_2BPP_UNORM_BLOCK_IMG                    :: 1000054000;
+    PVRTC1_4BPP_UNORM_BLOCK_IMG                    :: 1000054001;
+    PVRTC2_2BPP_UNORM_BLOCK_IMG                    :: 1000054002;
+    PVRTC2_4BPP_UNORM_BLOCK_IMG                    :: 1000054003;
+    PVRTC1_2BPP_SRGB_BLOCK_IMG                     :: 1000054004;
+    PVRTC1_4BPP_SRGB_BLOCK_IMG                     :: 1000054005;
+    PVRTC2_2BPP_SRGB_BLOCK_IMG                     :: 1000054006;
+    PVRTC2_4BPP_SRGB_BLOCK_IMG                     :: 1000054007;
+    ASTC_3x3x3_UNORM_BLOCK_EXT                     :: 1000288000;
+    ASTC_3x3x3_SRGB_BLOCK_EXT                      :: 1000288001;
+    ASTC_3x3x3_SFLOAT_BLOCK_EXT                    :: 1000288002;
+    ASTC_4x3x3_UNORM_BLOCK_EXT                     :: 1000288003;
+    ASTC_4x3x3_SRGB_BLOCK_EXT                      :: 1000288004;
+    ASTC_4x3x3_SFLOAT_BLOCK_EXT                    :: 1000288005;
+    ASTC_4x4x3_UNORM_BLOCK_EXT                     :: 1000288006;
+    ASTC_4x4x3_SRGB_BLOCK_EXT                      :: 1000288007;
+    ASTC_4x4x3_SFLOAT_BLOCK_EXT                    :: 1000288008;
+    ASTC_4x4x4_UNORM_BLOCK_EXT                     :: 1000288009;
+    ASTC_4x4x4_SRGB_BLOCK_EXT                      :: 1000288010;
+    ASTC_4x4x4_SFLOAT_BLOCK_EXT                    :: 1000288011;
+    ASTC_5x4x4_UNORM_BLOCK_EXT                     :: 1000288012;
+    ASTC_5x4x4_SRGB_BLOCK_EXT                      :: 1000288013;
+    ASTC_5x4x4_SFLOAT_BLOCK_EXT                    :: 1000288014;
+    ASTC_5x5x4_UNORM_BLOCK_EXT                     :: 1000288015;
+    ASTC_5x5x4_SRGB_BLOCK_EXT                      :: 1000288016;
+    ASTC_5x5x4_SFLOAT_BLOCK_EXT                    :: 1000288017;
+    ASTC_5x5x5_UNORM_BLOCK_EXT                     :: 1000288018;
+    ASTC_5x5x5_SRGB_BLOCK_EXT                      :: 1000288019;
+    ASTC_5x5x5_SFLOAT_BLOCK_EXT                    :: 1000288020;
+    ASTC_6x5x5_UNORM_BLOCK_EXT                     :: 1000288021;
+    ASTC_6x5x5_SRGB_BLOCK_EXT                      :: 1000288022;
+    ASTC_6x5x5_SFLOAT_BLOCK_EXT                    :: 1000288023;
+    ASTC_6x6x5_UNORM_BLOCK_EXT                     :: 1000288024;
+    ASTC_6x6x5_SRGB_BLOCK_EXT                      :: 1000288025;
+    ASTC_6x6x5_SFLOAT_BLOCK_EXT                    :: 1000288026;
+    ASTC_6x6x6_UNORM_BLOCK_EXT                     :: 1000288027;
+    ASTC_6x6x6_SRGB_BLOCK_EXT                      :: 1000288028;
+    ASTC_6x6x6_SFLOAT_BLOCK_EXT                    :: 1000288029;
+    R8_BOOL_ARM                                    :: 1000460000;
+    R16_SFLOAT_FPENCODING_BFLOAT16_ARM             :: 1000460001;
+    R8_SFLOAT_FPENCODING_FLOAT8E4M3_ARM            :: 1000460002;
+    R8_SFLOAT_FPENCODING_FLOAT8E5M2_ARM            :: 1000460003;
+    R16G16_SFIXED5_NV                              :: 1000464000;
+    R10X6_UINT_PACK16_ARM                          :: 1000609000;
+    R10X6G10X6_UINT_2PACK16_ARM                    :: 1000609001;
+    R10X6G10X6B10X6A10X6_UINT_4PACK16_ARM          :: 1000609002;
+    R12X4_UINT_PACK16_ARM                          :: 1000609003;
+    R12X4G12X4_UINT_2PACK16_ARM                    :: 1000609004;
+    R12X4G12X4B12X4A12X4_UINT_4PACK16_ARM          :: 1000609005;
+    R14X2_UINT_PACK16_ARM                          :: 1000609006;
+    R14X2G14X2_UINT_2PACK16_ARM                    :: 1000609007;
+    R14X2G14X2B14X2A14X2_UINT_4PACK16_ARM          :: 1000609008;
+    R14X2_UNORM_PACK16_ARM                         :: 1000609009;
+    R14X2G14X2_UNORM_2PACK16_ARM                   :: 1000609010;
+    R14X2G14X2B14X2A14X2_UNORM_4PACK16_ARM         :: 1000609011;
+    G14X2_B14X2R14X2_2PLANE_420_UNORM_3PACK16_ARM  :: 1000609012;
+    G14X2_B14X2R14X2_2PLANE_422_UNORM_3PACK16_ARM  :: 1000609013;
+    ASTC_4x4_SFLOAT_BLOCK_EXT                      :: 1000066000;
+    ASTC_5x4_SFLOAT_BLOCK_EXT                      :: 1000066001;
+    ASTC_5x5_SFLOAT_BLOCK_EXT                      :: 1000066002;
+    ASTC_6x5_SFLOAT_BLOCK_EXT                      :: 1000066003;
+    ASTC_6x6_SFLOAT_BLOCK_EXT                      :: 1000066004;
+    ASTC_8x5_SFLOAT_BLOCK_EXT                      :: 1000066005;
+    ASTC_8x6_SFLOAT_BLOCK_EXT                      :: 1000066006;
+    ASTC_8x8_SFLOAT_BLOCK_EXT                      :: 1000066007;
+    ASTC_10x5_SFLOAT_BLOCK_EXT                     :: 1000066008;
+    ASTC_10x6_SFLOAT_BLOCK_EXT                     :: 1000066009;
+    ASTC_10x8_SFLOAT_BLOCK_EXT                     :: 1000066010;
+    ASTC_10x10_SFLOAT_BLOCK_EXT                    :: 1000066011;
+    ASTC_12x10_SFLOAT_BLOCK_EXT                    :: 1000066012;
+    ASTC_12x12_SFLOAT_BLOCK_EXT                    :: 1000066013;
+    G8B8G8R8_422_UNORM_KHR                         :: 1000156000;
+    B8G8R8G8_422_UNORM_KHR                         :: 1000156001;
+    G8_B8_R8_3PLANE_420_UNORM_KHR                  :: 1000156002;
+    G8_B8R8_2PLANE_420_UNORM_KHR                   :: 1000156003;
+    G8_B8_R8_3PLANE_422_UNORM_KHR                  :: 1000156004;
+    G8_B8R8_2PLANE_422_UNORM_KHR                   :: 1000156005;
+    G8_B8_R8_3PLANE_444_UNORM_KHR                  :: 1000156006;
+    R10X6_UNORM_PACK16_KHR                         :: 1000156007;
+    R10X6G10X6_UNORM_2PACK16_KHR                   :: 1000156008;
+    R10X6G10X6B10X6A10X6_UNORM_4PACK16_KHR         :: 1000156009;
+    G10X6B10X6G10X6R10X6_422_UNORM_4PACK16_KHR     :: 1000156010;
+    B10X6G10X6R10X6G10X6_422_UNORM_4PACK16_KHR     :: 1000156011;
+    G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16_KHR :: 1000156012;
+    G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16_KHR  :: 1000156013;
+    G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16_KHR :: 1000156014;
+    G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16_KHR  :: 1000156015;
+    G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16_KHR :: 1000156016;
+    R12X4_UNORM_PACK16_KHR                         :: 1000156017;
+    R12X4G12X4_UNORM_2PACK16_KHR                   :: 1000156018;
+    R12X4G12X4B12X4A12X4_UNORM_4PACK16_KHR         :: 1000156019;
+    G12X4B12X4G12X4R12X4_422_UNORM_4PACK16_KHR     :: 1000156020;
+    B12X4G12X4R12X4G12X4_422_UNORM_4PACK16_KHR     :: 1000156021;
+    G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16_KHR :: 1000156022;
+    G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16_KHR  :: 1000156023;
+    G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16_KHR :: 1000156024;
+    G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16_KHR  :: 1000156025;
+    G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16_KHR :: 1000156026;
+    G16B16G16R16_422_UNORM_KHR                     :: 1000156027;
+    B16G16R16G16_422_UNORM_KHR                     :: 1000156028;
+    G16_B16_R16_3PLANE_420_UNORM_KHR               :: 1000156029;
+    G16_B16R16_2PLANE_420_UNORM_KHR                :: 1000156030;
+    G16_B16_R16_3PLANE_422_UNORM_KHR               :: 1000156031;
+    G16_B16R16_2PLANE_422_UNORM_KHR                :: 1000156032;
+    G16_B16_R16_3PLANE_444_UNORM_KHR               :: 1000156033;
+    G8_B8R8_2PLANE_444_UNORM_EXT                   :: 1000330000;
+    G10X6_B10X6R10X6_2PLANE_444_UNORM_3PACK16_EXT  :: 1000330001;
+    G12X4_B12X4R12X4_2PLANE_444_UNORM_3PACK16_EXT  :: 1000330002;
+    G16_B16R16_2PLANE_444_UNORM_EXT                :: 1000330003;
+    A4R4G4B4_UNORM_PACK16_EXT                      :: 1000340000;
+    A4B4G4R4_UNORM_PACK16_EXT                      :: 1000340001;
+
+    R16G16_S10_5_NV                                :: 1000464000;
+    A1B5G5R5_UNORM_PACK16_KHR                      :: 1000470000;
+    A8_UNORM_KHR                                   :: 1000470001;
+    MAX_ENUM                                       :: 2147483647;
+}
+
+Color_Space_Khr :: enum u32 {
+    SRGB_NONLINEAR_KHR            :: 0;
+    DISPLAY_P3_NONLINEAR_EXT      :: 1000104001;
+    EXTENDED_SRGB_LINEAR_EXT      :: 1000104002;
+    DISPLAY_P3_LINEAR_EXT         :: 1000104003;
+    DCI_P3_NONLINEAR_EXT          :: 1000104004;
+    BT709_LINEAR_EXT              :: 1000104005;
+    BT709_NONLINEAR_EXT           :: 1000104006;
+    BT2020_LINEAR_EXT             :: 1000104007;
+    HDR10_ST2084_EXT              :: 1000104008;
+
+    DOLBYVISION_EXT               :: 1000104009;
+    HDR10_HLG_EXT                 :: 1000104010;
+    ADOBERGB_LINEAR_EXT           :: 1000104011;
+    ADOBERGB_NONLINEAR_EXT        :: 1000104012;
+    PASS_THROUGH_EXT              :: 1000104013;
+    EXTENDED_SRGB_NONLINEAR_EXT   :: 1000104014;
+    DISPLAY_NATIVE_AMD            :: 1000213000;
+
+    COLORSPACE_SRGB_NONLINEAR_KHR :: 0;
+
+    DCI_P3_LINEAR_EXT             :: 1000104003;
+    MAX_ENUM_KHR                  :: 2147483647;
+}
+
 make_version :: (major: u32, minor: u32, patch: u32) -> u32 {
     return (major << 22) | (minor << 12) | patch;
 }
@@ -2255,6 +2762,76 @@ get_device_queue :: inline (device: Device, queue_family_index: u32, queue_index
     return queue;
 }
 
+get_physical_device_surface_capabilities_khr :: inline (
+    physical_device: Physical_Device,
+    surface: Surface_Khr,
+) -> Result, Surface_Capabilities_Khr {
+    capabilities: Surface_Capabilities_Khr = ---;
+
+    result := vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
+        physical_device,
+        surface,
+        *capabilities,
+    );
+
+    return result, capabilities;
+}
+
+get_physical_device_surface_formats_khr :: (
+    physical_device: Physical_Device,
+    surface: Surface_Khr,
+) -> Result, [..]Surface_Format_Khr {
+    formats: [..]Surface_Format_Khr;
+
+    count: u32;
+
+    result := vkGetPhysicalDeviceSurfaceFormatsKHR(
+        physical_device,
+        surface,
+        *count,
+        null,
+    );
+    if result != .SUCCESS {
+        return result, formats;
+    }
+
+    array_resize(*formats, count);
+
+    result = vkGetPhysicalDeviceSurfaceFormatsKHR(
+        physical_device,
+        surface,
+        *count,
+        formats.data,
+    );
+
+    return result, formats;
+}
+
+create_swapchain_khr :: inline (
+    device:        Device,
+    p_create_info: *Swapchain_Create_Info_Khr,
+    p_allocator:   *Allocation_Callbacks = null,
+) -> Result, Swapchain_Khr {
+    swapchain: Swapchain_Khr;
+
+    result := vkCreateSwapchainKHR(
+        device,
+        p_create_info,
+        p_allocator,
+        *swapchain,
+    );
+
+    return result, swapchain;
+}
+
+destroy_swapchain_khr :: (
+    device:      Device,
+    swapchain:   Swapchain_Khr,
+    p_allocator: *Allocation_Callbacks = null,
+) -> void #foreign libvulkan "vkDestroySwapchainKHR";
+
+
+
 #scope_file
 
 Instance_T        :: struct {};
@@ -2263,6 +2840,7 @@ Physical_Device_T :: struct {};
 Device_T          :: struct {};
 Queue_T           :: struct {};
 Device_Memory_T   :: struct {};
+Swapchain_Khr_T   :: struct {};
 
 vkCreateInstance :: (
     p_create_info: *Instance_Create_Info,
@@ -2289,25 +2867,45 @@ vkGetPhysicalDeviceQueueFamilyProperties2 :: (
 
 
 vkGetPhysicalDeviceSurfaceSupportKHR :: (
-    physical_device: Physical_Device,
+    physical_device:    Physical_Device,
     queue_family_index: u32,
-    surface: Surface_Khr,
-    p_supported: *Bool,
+    surface:            Surface_Khr,
+    p_supported:        *Bool,
 ) -> Result #foreign libvulkan;
 
 vkCreateDevice :: (
     physical_device: Physical_Device,
-    p_create_info: *Device_Create_Info,
-    p_allocator: *Allocation_Callbacks,
-    p_device: *Device,
+    p_create_info:   *Device_Create_Info,
+    p_allocator:     *Allocation_Callbacks,
+    p_device:        *Device,
 ) -> Result #foreign libvulkan;
 
 vkGetDeviceQueue :: (
-    device: Device,
+    device:             Device,
     queue_family_index: u32,
-    queue_index: u32,
-    p_queue: *Queue,
+    queue_index:        u32,
+    p_queue:            *Queue,
 ) -> void #foreign libvulkan;
+
+vkGetPhysicalDeviceSurfaceCapabilitiesKHR :: (
+    physical_device:        Physical_Device,
+    surface:                Surface_Khr,
+    p_surface_capabilities: *Surface_Capabilities_Khr,
+) -> Result #foreign libvulkan;
+
+vkGetPhysicalDeviceSurfaceFormatsKHR :: (
+    physical_device:        Physical_Device,
+    surface:                Surface_Khr,
+    p_surface_format_count: *u32,
+    p_surface_formats:      *Surface_Format_Khr,
+) -> Result #foreign libvulkan;
+
+vkCreateSwapchainKHR :: (
+    device:        Device,
+    p_create_info: *Swapchain_Create_Info_Khr,
+    p_allocator:   *Allocation_Callbacks,
+    p_swapchain:   *Swapchain_Khr,
+) -> Result #foreign libvulkan;
 
 #if OS == {
     case .LINUX;
