@@ -1,5 +1,6 @@
-Instance    :: #type *Instance_T;
-Surface_Khr :: #type *Surface_Khr_T;
+Instance        :: #type *Instance_T;
+Surface_Khr     :: #type *Surface_Khr_T;
+Physical_Device :: #type *Physical_Device_T;
 
 Bool :: #type,isa u32;
 TRUE:  Bool : 1;
@@ -27,6 +28,8 @@ Extension_Names :: struct {
 Layer_Names :: struct {
     VALIDATION :: "VK_LAYER_KHRONOS_validation";
 }
+
+Device_Size :: #type u64;
 
 Allocation_Callbacks :: struct {
     p_user_data:             *void;
@@ -124,6 +127,135 @@ Instance_Create_Info :: struct {
     pp_enabled_extension_names: **u8;
 }
 
+Physical_Device_Properties :: struct {
+    api_version:         u32;
+    driver_version:      u32;
+    vendor_id:           u32;
+    device_id:           u32;
+    device_type:         Physical_Device_Type;
+    device_name:         [256]u8;
+    pipeline_cache_uuid: [16]u8;
+    limits:              Physical_Device_Limits;
+    sparse_properties:   Physical_Device_Sparse_Properties;
+}
+
+Physical_Device_Sparse_Properties :: struct {
+    residency_standard_2d_block_shape:             Bool;
+    residency_standard_2d_multisample_block_shape: Bool;
+    residency_standard_3d_block_shape:             Bool;
+    residency_aligned_mip_size:                    Bool;
+    residency_non_resident_strict:                 Bool;
+}
+
+Physical_Device_Limits :: struct {
+    max_image_dimension_1d:                                u32;
+    max_image_dimension_2d:                                u32;
+    max_image_dimension_3d:                                u32;
+    max_image_dimension_cube:                              u32;
+    max_image_array_layers:                                u32;
+    max_texel_buffer_elements:                             u32;
+    max_uniform_buffer_range:                              u32;
+    max_storage_buffer_range:                              u32;
+    max_push_constants_size:                               u32;
+    max_memory_allocation_count:                           u32;
+    max_sampler_allocation_count:                          u32;
+    buffer_image_granularity:                              Device_Size;
+    sparse_address_space_size:                             Device_Size;
+    max_bound_descriptor_sets:                             u32;
+    max_per_stage_descriptor_samplers:                     u32;
+    max_per_stage_descriptor_uniform_buffers:              u32;
+    max_per_stage_descriptor_storage_buffers:              u32;
+    max_per_stage_descriptor_sampled_images:               u32;
+    max_per_stage_descriptor_storage_images:               u32;
+    max_per_stage_descriptor_input_attachments:            u32;
+    max_per_stage_resources:                               u32;
+    max_descriptor_set_samplers:                           u32;
+    max_descriptor_set_uniform_buffers:                    u32;
+    max_descriptor_set_uniform_buffers_dynamic:            u32;
+    max_descriptor_set_storage_buffers:                    u32;
+    max_descriptor_set_storage_buffers_dynamic:            u32;
+    max_descriptor_set_sampled_images:                     u32;
+    max_descriptor_set_storage_images:                     u32;
+    max_descriptor_set_input_attachments:                  u32;
+    max_vertex_input_attributes:                           u32;
+    max_vertex_input_bindings:                             u32;
+    max_vertex_input_attribute_offset:                     u32;
+    max_vertex_input_binding_stride:                       u32;
+    max_vertex_output_components:                          u32;
+    max_tessellation_generation_level:                     u32;
+    max_tessellation_patch_size:                           u32;
+    max_tessellation_control_per_vertex_input_components:  u32;
+    max_tessellation_control_per_vertex_output_components: u32;
+    max_tessellation_control_per_patch_output_components:  u32;
+    max_tessellation_control_total_output_components:      u32;
+    max_tessellation_evaluation_input_components:          u32;
+    max_tessellation_evaluation_output_components:         u32;
+    max_geometry_shader_invocations:                       u32;
+    max_geometry_input_components:                         u32;
+    max_geometry_output_components:                        u32;
+    max_geometry_output_vertices:                          u32;
+    max_geometry_total_output_components:                  u32;
+    max_fragment_input_components:                         u32;
+    max_fragment_output_attachments:                       u32;
+    max_fragment_dual_src_attachments:                     u32;
+    max_fragment_combined_output_resources:                u32;
+    max_compute_shared_memory_size:                        u32;
+    max_compute_work_group_count:                          [3] u32;
+    max_compute_work_group_invocations:                    u32;
+    max_compute_work_group_size:                           [3] u32;
+    sub_pixel_precision_bits:                              u32;
+    sub_texel_precision_bits:                              u32;
+    mipmap_precision_bits:                                 u32;
+    max_draw_indexed_index_value:                          u32;
+    max_draw_indirect_count:                               u32;
+    max_sampler_lod_bias:                                  float;
+    max_sampler_anisotropy:                                float;
+    max_viewports:                                         u32;
+    max_viewport_dimensions:                               [2] u32;
+    viewport_bounds_range:                                 [2] float;
+    viewport_sub_pixel_bits:                               u32;
+    min_memory_map_alignment:                              u64;
+    min_texel_buffer_offset_alignment:                     Device_Size;
+    min_uniform_buffer_offset_alignment:                   Device_Size;
+    min_storage_buffer_offset_alignment:                   Device_Size;
+    min_texel_offset:                                      s32;
+    max_texel_offset:                                      u32;
+    min_texel_gather_offset:                               s32;
+    max_texel_gather_offset:                               u32;
+    min_interpolation_offset:                              float;
+    max_interpolation_offset:                              float;
+    sub_pixel_interpolation_offset_bits:                   u32;
+    max_framebuffer_width:                                 u32;
+    max_framebuffer_height:                                u32;
+    max_framebuffer_layers:                                u32;
+    framebuffer_color_sample_counts:                       Sample_Count_Flags;
+    framebuffer_depth_sample_counts:                       Sample_Count_Flags;
+    framebuffer_stencil_sample_counts:                     Sample_Count_Flags;
+    framebuffer_no_attachments_sample_counts:              Sample_Count_Flags;
+    max_color_attachments:                                 u32;
+    sampled_image_color_sample_counts:                     Sample_Count_Flags;
+    sampled_image_integer_sample_counts:                   Sample_Count_Flags;
+    sampled_image_depth_sample_counts:                     Sample_Count_Flags;
+    sampled_image_stencil_sample_counts:                   Sample_Count_Flags;
+    storage_image_sample_counts:                           Sample_Count_Flags;
+    max_sample_mask_words:                                 u32;
+    timestamp_compute_and_graphics:                        Bool;
+    timestamp_period:                                      float;
+    max_clip_distances:                                    u32;
+    max_cull_distances:                                    u32;
+    max_combined_clip_and_cull_distances:                  u32;
+    discrete_queue_priorities:                             u32;
+    point_size_range:                                      [2] float;
+    line_width_range:                                      [2] float;
+    point_size_granularity:                                float;
+    line_width_granularity:                                float;
+    strict_lines:                                          Bool;
+    standard_sample_locations:                             Bool;
+    optimal_buffer_copy_offset_alignment:                  Device_Size;
+    optimal_buffer_copy_row_pitch_alignment:               Device_Size;
+    non_coherent_atom_size:                                Device_Size;
+}
+
 Debug_Utils_Messenger_Create_Flags_Ext :: enum_flags u32 {}
 
 Debug_Utils_Message_Type_Flags_Ext :: enum_flags u32 {
@@ -145,6 +277,17 @@ Debug_Utils_Messenger_Callback_Data_Flags_Ext :: enum_flags u32 {};
 Instance_Create_Flags :: enum_flags u32 {
     ENUMERATE_PORTABILITY_KHR     :: 1;
     FLAG_BITS_MAX_ENUM            :: 2147483647;
+}
+
+Sample_Count_Flags :: enum_flags u32 {
+    _1                 :: 1;
+    _2                 :: 2;
+    _4                 :: 4;
+    _8                 :: 8;
+    _16                :: 16;
+    _32                :: 32;
+    _64                :: 64;
+    FLAG_BITS_MAX_ENUM :: 2147483647;
 }
 
 Structure_Type :: enum u32 {
@@ -1757,6 +1900,15 @@ Internal_Allocation_Type :: enum u32 {
     MAX_ENUM   :: 2147483647;
 }
 
+Physical_Device_Type :: enum u32 {
+    OTHER          :: 0;
+    INTEGRATED_GPU :: 1;
+    DISCRETE_GPU   :: 2;
+    VIRTUAL_GPU    :: 3;
+    CPU            :: 4;
+    MAX_ENUM       :: 2147483647;
+}
+
 make_version :: (major: u32, minor: u32, patch: u32) -> u32 {
     return (major << 22) | (minor << 12) | patch;
 }
@@ -1777,16 +1929,57 @@ destroy_instance :: (
     p_allocator: *Allocation_Callbacks = null,
 ) -> void #foreign libvulkan "vkDestroyInstance";
 
+destroy_surface_khr :: (
+    instance:    Instance,
+    surface:     Surface_Khr,
+    p_allocator: *Allocation_Callbacks = null,
+) -> void #foreign libvulkan "vkDestroySurfaceKHR";
+
+enumerate_physical_devices :: (instance: Instance) -> Result, [..]Physical_Device {
+    physical_devices: [..]Physical_Device;
+    count: u32;
+
+    result := vkEnumeratePhysicalDevices(instance, *count, null);
+    if result != .SUCCESS {
+        return result, physical_devices;
+    }
+
+    array_resize(*physical_devices, count);
+
+    result = vkEnumeratePhysicalDevices(instance, *count, physical_devices.data);
+
+    return result, physical_devices;
+}
+
+get_physical_device_properties :: inline (physical_device: Physical_Device) -> Physical_Device_Properties {
+    properties: Physical_Device_Properties;
+    vkGetPhysicalDeviceProperties(physical_device, *properties);
+
+    return properties;
+}
+
 #scope_file
 
-Instance_T    :: struct {};
-Surface_Khr_T :: struct {};
+Instance_T        :: struct {};
+Surface_Khr_T     :: struct {};
+Physical_Device_T :: struct {};
 
 vkCreateInstance :: (
     p_create_info: *Instance_Create_Info,
-    p_allocator: *Allocation_Callbacks,
-    p_instance: *Instance,
+    p_allocator:   *Allocation_Callbacks,
+    p_instance:    *Instance,
 ) -> Result #foreign libvulkan;
+
+vkEnumeratePhysicalDevices :: (
+    instance:                Instance,
+    p_physical_device_count: *u32,
+    p_physical_devices:      *Physical_Device,
+) -> Result #foreign libvulkan;
+
+vkGetPhysicalDeviceProperties :: (
+    physical_device: Physical_Device,
+    p_properties: *Physical_Device_Properties,
+) -> void #foreign libvulkan;
 
 #if OS == {
     case .LINUX;
@@ -1794,3 +1987,5 @@ vkCreateInstance :: (
     case;
         #assert "Unsupported OS";
 }
+
+#import "Basic";

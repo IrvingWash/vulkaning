@@ -4,8 +4,9 @@ Additional_Instance_Extensions_Getter :: #type () -> [..]*u8;
 Surface_Creator :: #type (window: *Window_Type, instance: *void, allocator: *void = null) -> *void;
 
 Renderer :: struct {
-    instance: VK.Instance;
-    surface:  VK.Surface_Khr;
+    instance:        VK.Instance;
+    surface:         VK.Surface_Khr;
+    physical_device: VK.Physical_Device;
 }
 
 init :: (
@@ -17,17 +18,39 @@ init :: (
 
     renderer.instance = create_instance(get_additional_instance_extensions);
     renderer.surface  = create_surface(window, renderer.instance);
+    renderer.physical_device = find_physical_device(renderer.instance);
 
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
+    VK.destroy_surface_khr(renderer.instance, renderer.surface);
+
     VK.destroy_instance(renderer.instance);
 
     renderer.* = {};
 }
 
 #scope_file
+
+find_physical_device :: (instance: VK.Instance) -> VK.Physical_Device {
+    result, physical_devices := VK.enumerate_physical_devices(instance);
+    assert(result == .SUCCESS);
+
+    the_device: VK.Physical_Device;
+    for device: physical_devices {
+        properties := VK.get_physical_device_properties(device);
+
+        if properties.device_type == .DISCRETE_GPU {
+            the_device = device;
+            break;
+        }
+    }
+
+    assert(the_device != null);
+
+    return the_device;
+}
 
 create_instance :: (get_additional_instance_extensions: Additional_Instance_Extensions_Getter)  -> VK.Instance {
     application_info: VK.Application_Info = {
@@ -71,7 +94,6 @@ create_instance :: (get_additional_instance_extensions: Additional_Instance_Exte
 
     result, instance := VK.create_instance(*instance_create_info);
     assert(result == .SUCCESS);
-    assert(instance != null);
 
     return instance;
 }
