@@ -6,7 +6,10 @@
 );
 
 SDL :: #import "SDL3";
-Renderer :: #import,dir "Renderer"()(DEBUG = DEBUG);
+Renderer :: #import,dir "Renderer"()(
+    Window_Type = SDL.Window,
+    DEBUG       = DEBUG
+);
 
 State :: struct {
     is_running: bool;
@@ -14,6 +17,8 @@ State :: struct {
     window: *SDL.Window;
     width:  s32 = 800;
     height: s32 = 600;
+
+    renderer: Renderer.Renderer;
 }
 
 main :: () {
@@ -24,6 +29,7 @@ main :: () {
     state: State;
 
     init(*state);
+    defer deinit(*state);
 
     while state.is_running {
         process_input(*state);
@@ -43,7 +49,16 @@ init :: (state: *State) {
     );
     assert(state.window != null, "Failed to create SDL Window");
 
-    Renderer.init(get_sdl_instance_extensions);
+    state.renderer = Renderer.init(state.window, get_sdl_instance_extensions, SDL.vulkan_create_surface);
+}
+
+deinit :: (state: *State) {
+    Renderer.deinit(*state.renderer);
+
+    SDL.destroy_window(state.window);
+    SDL.quit();
+
+    state.* = {};
 }
 
 process_input :: (state: *State) {

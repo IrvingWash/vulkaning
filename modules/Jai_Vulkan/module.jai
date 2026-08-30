@@ -1,4 +1,5 @@
-Instance :: #type *Instance_T;
+Instance    :: #type *Instance_T;
+Surface_Khr :: #type *Surface_Khr_T;
 
 Bool :: #type,isa u32;
 TRUE:  Bool : 1;
@@ -1771,9 +1772,15 @@ create_instance :: inline (
     return result, instance;
 }
 
+destroy_instance :: (
+    instance:    Instance,
+    p_allocator: *Allocation_Callbacks = null,
+) -> void #foreign libvulkan "vkDestroyInstance";
+
 #scope_file
 
-Instance_T :: struct {};
+Instance_T    :: struct {};
+Surface_Khr_T :: struct {};
 
 vkCreateInstance :: (
     p_create_info: *Instance_Create_Info,

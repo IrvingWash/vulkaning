@@ -993,10 +993,22 @@ Audio_Device_Event :: struct {
 init_subsystem :: (flags: Init_Flags) -> bool #foreign libsdl3 "SDL_InitSubSystem";
 poll_event :: (event: *Event) -> bool #foreign libsdl3 "SDL_PollEvent";
 create_window :: (title: *u8, w: s32, h: s32, flags: Window_Flags) -> *Window #foreign libsdl3 "SDL_CreateWindow";
+destroy_window :: (window: *Window) -> void #foreign libsdl3 "SDL_DestroyWindow";
+quit :: () -> void #foreign libsdl3 "SDL_Quit";
 
 vulkan_get_instance_extensions :: (count: *u32) -> **u8 #foreign libsdl3 "SDL_Vulkan_GetInstanceExtensions";
 
+vulkan_create_surface :: (window: *Window, instance: *void, allocator: *void = null) -> *void {
+    surface: *void;
+
+    ok := SDL_Vulkan_CreateSurface(window, instance, allocator, *surface);
+
+    return surface;
+}
+
 #scope_file
+
+SDL_Vulkan_CreateSurface :: (window: *void, instance: *void, allocator: *void, surface: *void) -> bool #foreign libsdl3;
 
 #if OS == {
     case .LINUX;

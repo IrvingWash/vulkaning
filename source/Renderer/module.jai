@@ -1,9 +1,30 @@
-#module_parameters()(DEBUG := false);
+#module_parameters()(Window_Type: Type, DEBUG := false);
 
 Additional_Instance_Extensions_Getter :: #type () -> [..]*u8;
+Surface_Creator :: #type (window: *Window_Type, instance: *void, allocator: *void = null) -> *void;
 
-init :: (get_additional_instance_extensions: Additional_Instance_Extensions_Getter) {
-    instance := create_instance(get_additional_instance_extensions);
+Renderer :: struct {
+    instance: VK.Instance;
+    surface:  VK.Surface_Khr;
+}
+
+init :: (
+    window: *void,
+    get_additional_instance_extensions: Additional_Instance_Extensions_Getter,
+    create_surface: Surface_Creator,
+) -> Renderer {
+    renderer: Renderer;
+
+    renderer.instance = create_instance(get_additional_instance_extensions);
+    renderer.surface  = create_surface(window, renderer.instance);
+
+    return renderer;
+}
+
+deinit :: (renderer: *Renderer) {
+    VK.destroy_instance(renderer.instance);
+
+    renderer.* = {};
 }
 
 #scope_file
