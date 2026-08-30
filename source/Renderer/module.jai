@@ -4,9 +4,10 @@ Additional_Instance_Extensions_Getter :: #type () -> [..]*u8;
 Surface_Creator :: #type (window: *Window_Type, instance: *void, allocator: *void = null) -> *void;
 
 Renderer :: struct {
-    instance:        VK.Instance;
-    surface:         VK.Surface_Khr;
-    physical_device: VK.Physical_Device;
+    instance:             VK.Instance;
+    surface:              VK.Surface_Khr;
+    physical_device:      VK.Physical_Device;
+    graphics_queue_index: int;
 }
 
 init :: (
@@ -16,9 +17,10 @@ init :: (
 ) -> Renderer {
     renderer: Renderer;
 
-    renderer.instance = create_instance(get_additional_instance_extensions);
-    renderer.surface  = create_surface(window, renderer.instance);
-    renderer.physical_device = find_physical_device(renderer.instance);
+    renderer.instance             = create_instance(get_additional_instance_extensions);
+    renderer.surface              = create_surface(window,                              renderer.instance);
+    renderer.physical_device      = find_physical_device(renderer.instance);
+    renderer.graphics_queue_index = find_graphics_queue_index(renderer.physical_device, renderer.surface);
 
     return renderer;
 }
@@ -32,6 +34,29 @@ deinit :: (renderer: *Renderer) {
 }
 
 #scope_file
+
+find_graphics_queue_index :: (physical_device: VK.Physical_Device, surface: VK.Surface_Khr) -> int {
+    queue_family_properties := VK.get_physical_device_queue_family_properties_2(physical_device);
+
+    the_index: int = -1;
+    for qf: queue_family_properties {
+        properties           := queue_family_properties[it_index];
+        ok, is_surface_supported := VK.get_physical_device_surface_support_khr(physical_device, xx it_index, surface);
+        assert(ok == .SUCCESS);
+
+        if (
+            properties.queue_family_properties.queue_flags & .GRAPHICS
+            && is_surface_supported
+        ) {
+            the_index = it_index;
+            break;
+        }
+    }
+
+    assert(the_index >= 0);
+
+    return the_index;
+}
 
 find_physical_device :: (instance: VK.Instance) -> VK.Physical_Device {
     result, physical_devices := VK.enumerate_physical_devices(instance);

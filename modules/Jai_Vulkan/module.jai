@@ -256,6 +256,32 @@ Physical_Device_Limits :: struct {
     non_coherent_atom_size:                                Device_Size;
 }
 
+Queue_Family_Properties_2 :: struct {
+    s_type                   := Structure_Type.QUEUE_FAMILY_PROPERTIES_2;
+    p_next:                  *void;
+    queue_family_properties: Queue_Family_Properties;
+}
+
+Queue_Family_Properties :: struct {
+    queue_flags:                    Queue_Flags;
+    queue_count:                    u32;
+    timestamp_valid_bits:           u32;
+    min_image_transfer_granularity: Extent_3D;
+}
+
+Extent_3D :: struct {
+    width:  u32;
+    height: u32;
+    depth:  u32;
+
+    #overlay(width) _2D: Extent_2D;
+}
+
+Extent_2D :: struct {
+    width:  u32;
+    height: u32;
+}
+
 Debug_Utils_Messenger_Create_Flags_Ext :: enum_flags u32 {}
 
 Debug_Utils_Message_Type_Flags_Ext :: enum_flags u32 {
@@ -288,6 +314,19 @@ Sample_Count_Flags :: enum_flags u32 {
     _32                :: 32;
     _64                :: 64;
     FLAG_BITS_MAX_ENUM :: 2147483647;
+}
+
+Queue_Flags :: enum_flags u32 {
+    GRAPHICS             :: 1;
+    COMPUTE              :: 2;
+    TRANSFER             :: 4;
+    SPARSE_BINDING       :: 8;
+    PROTECTED            :: 16;
+    VIDEO_DECODE_KHR     :: 32;
+    VIDEO_ENCODE_KHR     :: 64;
+    OPTICAL_FLOW_NV      :: 256;
+    DATA_GRAPH_ARM       :: 1024;
+    FLAG_BITS_MAX_ENUM   :: 2147483647;
 }
 
 Structure_Type :: enum u32 {
@@ -1958,6 +1997,36 @@ get_physical_device_properties :: inline (physical_device: Physical_Device) -> P
     return properties;
 }
 
+get_physical_device_queue_family_properties_2 :: inline (physical_device: Physical_Device) -> [..]Queue_Family_Properties_2 {
+    qfps: [..]Queue_Family_Properties_2;
+    count: u32;
+
+    vkGetPhysicalDeviceQueueFamilyProperties2(physical_device, *count, null);
+
+    array_resize(*qfps, count);
+
+    vkGetPhysicalDeviceQueueFamilyProperties2(physical_device, *count, qfps.data);
+
+    return qfps;
+}
+
+get_physical_device_surface_support_khr :: inline (
+    physical_device:    Physical_Device,
+    queue_family_index: u32,
+    surface:            Surface_Khr,
+) -> Result, bool {
+    is_supported: Bool;
+
+    result := vkGetPhysicalDeviceSurfaceSupportKHR(
+        physical_device,
+        queue_family_index,
+        surface,
+        *is_supported,
+    );
+
+    return result, cast(bool, is_supported);
+}
+
 #scope_file
 
 Instance_T        :: struct {};
@@ -1978,8 +2047,23 @@ vkEnumeratePhysicalDevices :: (
 
 vkGetPhysicalDeviceProperties :: (
     physical_device: Physical_Device,
-    p_properties: *Physical_Device_Properties,
+    p_properties:    *Physical_Device_Properties,
 ) -> void #foreign libvulkan;
+
+vkGetPhysicalDeviceQueueFamilyProperties2 :: (
+    physical_device:               Physical_Device,
+    p_queue_family_property_count: *u32,
+    p_queue_family_properties:     *Queue_Family_Properties_2,
+) -> void #foreign libvulkan;
+
+
+vkGetPhysicalDeviceSurfaceSupportKHR :: (
+    physical_device: Physical_Device,
+    queue_family_index: u32,
+    surface: Surface_Khr,
+    p_supported: *Bool,
+) -> Result #foreign libvulkan;
+
 
 #if OS == {
     case .LINUX;
