@@ -18,6 +18,9 @@ Renderer :: struct {
     depth: Depth;
 
     allocator: VMA.Allocator;
+
+    vert_shader: VK.Shader_Module;
+    frag_shader: VK.Shader_Module;
 }
 
 Swapchain :: struct {
@@ -67,10 +70,17 @@ init :: (
 
     renderer.depth = create_depth_image(renderer.device, renderer.allocator, renderer.swapchain.config);
 
+    exe_path := path_strip_filename(get_path_of_running_executable());
+    renderer.vert_shader = create_shader_module(renderer.device, tprint("%shaders/vertex.spv", exe_path));
+    renderer.frag_shader = create_shader_module(renderer.device, tprint("%shaders/fragment.spv", exe_path));
+
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
+    VK.destroy_shader_module(renderer.device, renderer.vert_shader);
+    VK.destroy_shader_module(renderer.device, renderer.frag_shader);
+
     destroy_depth(renderer.device, renderer.allocator, *renderer.depth);
 
     destroy_swapchain(renderer.device, *renderer.swapchain);
@@ -86,9 +96,29 @@ deinit :: (renderer: *Renderer) {
     renderer.* = {};
 }
 
+
+
 #scope_file
 
 VULKAN_API_VERSION :: #run VK.make_version(1, 4, 350);
+
+create_shader_module :: (device: VK.Device, path: string) -> VK.Shader_Module {
+    File :: #import "File";
+
+    file_content, ok := File.read_entire_file(path);
+    assert(ok);
+    defer free(file_content);
+
+    shader_module_create_info := VK.Shader_Module_Create_Info.{
+        code_size = cast(u64, file_content.count * size_of(u8)),
+        p_code    = cast(*u32, file_content.data),
+    };
+
+    result, shader_module := VK.create_shader_module(device, *shader_module_create_info);
+    assert(result == .SUCCESS);
+
+    return shader_module;
+}
 
 destroy_depth :: (device: VK.Device, allocator: VMA.Allocator, depth: *Depth) {
     VK.destroy_image_view(device, depth.view);
@@ -454,5 +484,7 @@ on_debug_message: VK.Pfn_Debug_Utils_Messenger_Callback_Ext : (
 
 #import "Basic";
 #import "Math";
+#import "System";
+#import "String";
 VK  :: #import "Jai_Vulkan";
 VMA :: #import "Vulkan_Memory_Allocator"(DEBUG = DEBUG);

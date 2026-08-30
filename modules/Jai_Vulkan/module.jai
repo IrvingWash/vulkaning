@@ -8,6 +8,7 @@ Swapchain_Khr   :: #type *Swapchain_Khr_T;
 Image           :: #type *Image_T;
 Image_View      :: #type *Image_View_T;
 Semaphore       :: #type *Semaphore_T;
+Shader_Module   :: #type *Shader_Module_T;
 
 Bool :: #type,isa u32;
 TRUE:  Bool : 1;
@@ -565,6 +566,14 @@ Image_Create_Info :: struct {
     initial_layout:           Image_Layout;
 }
 
+Shader_Module_Create_Info :: struct {
+    s_type :=  Structure_Type.SHADER_MODULE_CREATE_INFO;
+    p_next:    *void;
+    flags:     Shader_Module_Create_Flags;
+    code_size: u64;
+    p_code:    *u32;
+}
+
 Component_Swizzle :: enum u32 {
     IDENTITY :: 0;
     ZERO     :: 1;
@@ -736,6 +745,8 @@ Memory_Property_Flags :: enum_flags u32 {
     RDMA_CAPABLE_NV     :: 256;
     FLAG_BITS_MAX_ENUM  :: 2147483647;
 }
+
+Shader_Module_Create_Flags :: enum_flags u32 {}
 
 Image_Create_Flags :: enum u32 {
     SPARSE_BINDING                            :: 1;
@@ -3119,6 +3130,29 @@ create_semaphore :: inline (
     return result, semaphore;
 }
 
+create_shader_module :: (
+    device:        Device,
+    p_create_info: *Shader_Module_Create_Info,
+    p_allocator:   *Allocation_Callbacks = null,
+) -> Result, Shader_Module {
+    shader_module: Shader_Module;
+
+    result := vkCreateShaderModule(
+        device,
+        p_create_info,
+        p_allocator,
+        *shader_module,
+    );
+
+    return result, shader_module;
+}
+
+destroy_shader_module :: (
+    device:       Device,
+    shaderModule: Shader_Module,
+    pAllocator:   *Allocation_Callbacks = null,
+) -> void #foreign libvulkan "vkDestroyShaderModule";
+
 
 
 #scope_file
@@ -3133,6 +3167,7 @@ Swapchain_Khr_T   :: struct {};
 Image_T           :: struct {};
 Image_View_T      :: struct {};
 Semaphore_T       :: struct {};
+Shader_Module_T   :: struct {};
 
 vkCreateInstance :: (
     p_create_info: *Instance_Create_Info,
@@ -3207,10 +3242,10 @@ vkGetSwapchainImagesKHR :: (
 ) -> Result #foreign libvulkan;
 
 vkCreateImageView :: (
-    device: Device,
+    device:        Device,
     p_create_info: *Image_View_Create_Info,
-    p_allocator: *Allocation_Callbacks,
-    p_view: *Image_View,
+    p_allocator:   *Allocation_Callbacks,
+    p_view:        *Image_View,
 ) -> Result #foreign libvulkan;
 
 vkCreateSemaphore :: (
@@ -3218,6 +3253,13 @@ vkCreateSemaphore :: (
     p_create_info: *Semaphore_Create_Info,
     p_allocator:   *Allocation_Callbacks,
     p_semaphore:   *Semaphore
+) -> Result #foreign libvulkan;
+
+vkCreateShaderModule :: (
+    device:          Device,
+    p_create_info:   *Shader_Module_Create_Info,
+    p_allocator:     *Allocation_Callbacks,
+    p_shader_module: *Shader_Module,
 ) -> Result #foreign libvulkan;
 
 #if OS == {

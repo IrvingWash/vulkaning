@@ -5,6 +5,7 @@
 #import "String";
 #import "Metaprogram_Plugins";
 #import "File";
+#import,file "compile_shaders.jai";
 
 Config :: struct {
     optimization_type: Optimization_Type;
@@ -41,6 +42,13 @@ BUILD_ENTRY_FILE :: #run tprint("%source/main.jai", #filepath);
     }
 
     output_path := tprint("%bin/%", #filepath, config.optimization_type);
+
+    error = compile_shaders(config.optimization_type);
+    if error {
+        log_error("Failed to build: %", error);
+        compiler_set_workspace_status(.FAILED);
+        return;
+    }
 
     error = build(build_options_dc, config, output_path);
     if error {
