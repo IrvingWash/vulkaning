@@ -8,19 +8,31 @@ Renderer :: struct {
     instance:             VK.Instance;
     surface:              VK.Surface_Khr;
     physical_device:      VK.Physical_Device;
+    device:               VK.Device;
 
     graphics_queue_index: int;
-    device:               VK.Device;
     graphics_queue:       VK.Queue;
 
-    swapchain:             VK.Swapchain_Khr;
-    swapchain_config:      VK.Swapchain_Create_Info_Khr;
-    swapchain_images:      [..]VK.Image;
-    swapchain_image_views: [..]VK.Image_View;
+    swapchain: Swapchain;
 
-    render_complete_semaphores: [..]VK.Semaphore;
+    depth: Depth;
 
     allocator: VMA.Allocator;
+}
+
+Swapchain :: struct {
+    swapchain: VK.Swapchain_Khr;
+    config:    VK.Swapchain_Create_Info_Khr;
+    images:    [..]VK.Image;
+    views:     [..]VK.Image_View;
+
+    render_complete_semaphores: [..]VK.Semaphore;
+}
+
+Depth :: struct {
+    image:      VK.Image;
+    view:       VK.Image_View;
+    allocation: VMA.Allocation;
 }
 
 init :: (
@@ -38,40 +50,28 @@ init :: (
     renderer.device               = create_device(renderer.physical_device, renderer.graphics_queue_index);
     renderer.graphics_queue       = VK.get_device_queue(renderer.device, xx renderer.graphics_queue_index, 0);
 
-    renderer.allocator = init_vma(renderer);
-
-    renderer.swapchain,
-    renderer.swapchain_config = create_swapchain(
+    renderer.swapchain = create_swapchain(
         renderer.physical_device,
         renderer.surface,
         renderer.device,
         window,
         get_window_pixel_size,
+        null,
     );
 
-    renderer.swapchain_images,
-    renderer.swapchain_image_views = get_swapchain_images(renderer.device, renderer.swapchain);
+    renderer.allocator = init_vma(renderer);
 
-    renderer.render_complete_semaphores = create_render_complete_semaphores(renderer.device, renderer.swapchain_images);
+    renderer.depth = create_depth_image(renderer.device, renderer.allocator, renderer.swapchain.config);
 
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
-    for renderer.render_complete_semaphores {
-        VK.destroy_semaphore(renderer.device, it);
-    }
-    array_free(renderer.render_complete_semaphores);
-
-    for image_view: renderer.swapchain_image_views {
-        VK.destroy_image_view(renderer.device, image_view);
-    }
-    array_free(renderer.swapchain_image_views);
-    array_free(renderer.swapchain_images);
+    destroy_depth(renderer.device, renderer.allocator, *renderer.depth);
 
     VMA.destroy_allocator(renderer.allocator);
 
-    VK.destroy_swapchain_khr(renderer.device, renderer.swapchain);
+    destroy_swapchain(renderer.device, *renderer.swapchain);
 
     VK.destroy_surface_khr(renderer.instance, renderer.surface);
 
@@ -87,6 +87,79 @@ deinit :: (renderer: *Renderer) {
 VULKAN_API_VERSION :: #run VK.make_version(1, 4, 350);
 
 SWAPCHAIN_IMAGE_FORMAT :: VK.Format.B8G8R8A8_SRGB;
+DEPTH_IMAGE_FORMAT     :: VK.Format.D32_SFLOAT;
+
+destroy_depth :: (device: VK.Device, allocator: VMA.Allocator, depth: *Depth) {
+    VK.destroy_image_view(device, depth.view);
+    VMA.destroy_image(allocator, depth.image, depth.allocation);
+
+    depth.* = {};
+}
+
+destroy_swapchain :: (device: VK.Device, swapchain: *Swapchain) {
+    for image_view: swapchain.views {
+        VK.destroy_image_view(device, image_view);
+    }
+    array_free(swapchain.views);
+    array_free(swapchain.images);
+
+    for swapchain.render_complete_semaphores {
+        VK.destroy_semaphore(device, it);
+    }
+    array_free(swapchain.render_complete_semaphores);
+
+    VK.destroy_swapchain_khr(device, swapchain.swapchain);
+
+    swapchain.* = {};
+}
+
+create_depth_image :: (
+    device: VK.Device,
+    allocator: VMA.Allocator,
+    swapchain_config: VK.Swapchain_Create_Info_Khr,
+) -> Depth {
+    depth: Depth;
+
+    image_create_info := VK.Image_Create_Info.{
+        image_type = ._2D,
+        format     = DEPTH_IMAGE_FORMAT,
+        extent     = {
+            width  = swapchain_config.image_extent.width,
+            height = swapchain_config.image_extent.height,
+            depth  = 1,
+        },
+        mip_levels     = 1,
+        array_layers   = 1,
+        samples        = ._1,
+        tiling         = .OPTIMAL,
+        usage          = .DEPTH_STENCIL_ATTACHMENT,
+        initial_layout = .UNDEFINED,
+    };
+
+    allocation_create_info := VMA.Allocation_Create_Info.{
+        flags = .DEDICATED_MEMORY,
+        usage = .AUTO,
+    };
+
+    result:, depth.image, depth.allocation = VMA.create_image(allocator, *image_create_info, *allocation_create_info);
+    assert(result == .SUCCESS);
+
+    image_view_create_info := VK.Image_View_Create_Info.{
+        image             = depth.image,
+        view_type         = ._2D,
+        format            = DEPTH_IMAGE_FORMAT,
+        subresource_range = {
+            aspect_mask = .DEPTH,
+            level_count = 1,
+            layer_count = 1,
+        },
+    };
+
+    result, depth.view = VK.create_image_view(device, *image_view_create_info);
+    assert(result == .SUCCESS);
+
+    return depth;
+}
 
 create_render_complete_semaphores :: (device: VK.Device, swapchain_images: []VK.Image) -> [..]VK.Semaphore {
     semaphores: [..]VK.Semaphore;
@@ -136,7 +209,10 @@ create_swapchain :: (
     device:                VK.Device,
     window:                *Window_Type,
     get_window_pixel_size: Window_Pixel_Size_Getter,
-) -> VK.Swapchain_Khr, VK.Swapchain_Create_Info_Khr {
+    old_swapchain:         VK.Swapchain_Khr,
+) -> Swapchain {
+    swapchain: Swapchain;
+
     result, surface_capabilities := VK.get_physical_device_surface_capabilities_khr(physical_device, surface);
     assert(result == .SUCCESS);
 
@@ -155,7 +231,7 @@ create_swapchain :: (
         image_extent.height = clamp(cast(u32, height), surface_capabilities.min_image_extent.height, surface_capabilities.max_image_extent.height);
     }
 
-    swapchain_create_info := VK.Swapchain_Create_Info_Khr.{
+    swapchain.config = VK.Swapchain_Create_Info_Khr.{
         surface            = surface,
         min_image_count    = xx image_count_to_request,
         image_format       = SWAPCHAIN_IMAGE_FORMAT, // We check if this format is supported earlier, when we look for the physical device
@@ -166,12 +242,18 @@ create_swapchain :: (
         pre_transform      = surface_capabilities.current_transform,
         composite_alpha    = .OPAQUE_KHR,
         present_mode       = .FIFO_KHR,
+        old_swapchain      = old_swapchain,
     };
 
-    result =, swapchain := VK.create_swapchain_khr(device, *swapchain_create_info);
+    result, swapchain.swapchain = VK.create_swapchain_khr(device, *swapchain.config);
     assert(result == .SUCCESS);
 
-    return swapchain, swapchain_create_info;
+    swapchain.images,
+    swapchain.views = get_swapchain_images(device, swapchain.swapchain);
+
+    swapchain.render_complete_semaphores = create_render_complete_semaphores(device, swapchain.images);
+
+    return swapchain;
 }
 
 init_vma :: (renderer: Renderer) -> VMA.Allocator {

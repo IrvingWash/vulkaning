@@ -547,6 +547,24 @@ Semaphore_Create_Info :: struct {
     flags:    Semaphore_Create_Flags;
 }
 
+Image_Create_Info :: struct {
+    s_type :=                 Structure_Type.IMAGE_CREATE_INFO;
+    p_next:                   *void;
+    flags:                    Image_Create_Flags;
+    image_type:               Image_Type;
+    format:                   Format;
+    extent:                   Extent_3D;
+    mip_levels:               u32;
+    array_layers:             u32;
+    samples:                  Sample_Count_Flags;
+    tiling:                   Image_Tiling;
+    usage:                    Image_Usage_Flags;
+    sharing_mode:             Sharing_Mode;
+    queue_family_index_count: u32;
+    p_queue_family_indices:   *u32;
+    initial_layout:           Image_Layout;
+}
+
 Component_Swizzle :: enum u32 {
     IDENTITY :: 0;
     ZERO     :: 1;
@@ -705,6 +723,52 @@ Image_Aspect_Flags :: enum_flags u32 {
 }
 
 Semaphore_Create_Flags :: enum_flags u32 {}
+
+Memory_Property_Flags :: enum_flags u32 {
+    DEVICE_LOCAL        :: 1;
+    HOST_VISIBLE        :: 2;
+    HOST_COHERENT       :: 4;
+    HOST_CACHED         :: 8;
+    LAZILY_ALLOCATED    :: 16;
+    PROTECTED           :: 32;
+    DEVICE_COHERENT_AMD :: 64;
+    DEVICE_UNCACHED_AMD :: 128;
+    RDMA_CAPABLE_NV     :: 256;
+    FLAG_BITS_MAX_ENUM  :: 2147483647;
+}
+
+Image_Create_Flags :: enum u32 {
+    SPARSE_BINDING                            :: 1;
+    SPARSE_RESIDENCY                          :: 2;
+    SPARSE_ALIASED                            :: 4;
+    MUTABLE_FORMAT                            :: 8;
+    CUBE_COMPATIBLE                           :: 16;
+    ALIAS                                     :: 1024;
+    SPLIT_INSTANCE_BIND_REGIONS               :: 64;
+    _2D_ARRAY_COMPATIBLE                      :: 32;
+    BLOCK_TEXEL_VIEW_COMPATIBLE               :: 128;
+    EXTENDED_USAGE                            :: 256;
+    PROTECTED                                 :: 2048;
+    DISJOINT                                  :: 512;
+    CORNER_SAMPLED_NV                         :: 8192;
+    DESCRIPTOR_HEAP_CAPTURE_REPLAY_EXT        :: 65536;
+    SAMPLE_LOCATIONS_COMPATIBLE_DEPTH_EXT     :: 4096;
+    SUBSAMPLED_EXT                            :: 16384;
+    MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_EXT :: 262144;
+    _2D_VIEW_COMPATIBLE_EXT                   :: 131072;
+    VIDEO_PROFILE_INDEPENDENT_KHR             :: 1048576;
+    FRAGMENT_DENSITY_MAP_OFFSET_EXT           :: 32768;
+    ALIAS_SINGLE_LAYER_DESCRIPTOR_KHR         :: 4194304;
+    SPLIT_INSTANCE_BIND_REGIONS_KHR           :: 64;
+    _2D_ARRAY_COMPATIBLE_KHR                  :: 32;
+    BLOCK_TEXEL_VIEW_COMPATIBLE_KHR           :: 128;
+    EXTENDED_USAGE_KHR                        :: 256;
+    DISJOINT_KHR                              :: 512;
+    ALIAS_KHR                                 :: 1024;
+    DESCRIPTOR_BUFFER_CAPTURE_REPLAY_EXT      :: 65536;
+    FRAGMENT_DENSITY_MAP_OFFSET_QCOM          :: 32768;
+    FLAG_BITS_MAX_ENUM                        :: 2147483647;
+}
 
 Structure_Type :: enum u32 {
     APPLICATION_INFO                                                       :: 0;
@@ -2737,6 +2801,66 @@ Image_View_Type :: enum u32 {
     _2D_ARRAY  :: 5;
     CUBE_ARRAY :: 6;
     MAX_ENUM   :: 2147483647;
+}
+
+Image_Type :: enum u32 {
+    _1D      :: 0;
+    _2D      :: 1;
+    _3D      :: 2;
+    MAX_ENUM :: 2147483647;
+}
+
+Image_Tiling :: enum u32 {
+    OPTIMAL                 :: 0;
+    LINEAR                  :: 1;
+    DRM_FORMAT_MODIFIER_EXT :: 1000158000;
+    MAX_ENUM                :: 2147483647;
+}
+
+Image_Layout :: enum u32 {
+    UNDEFINED                                      :: 0;
+    GENERAL                                        :: 1;
+    COLOR_ATTACHMENT_OPTIMAL                       :: 2;
+    DEPTH_STENCIL_ATTACHMENT_OPTIMAL               :: 3;
+    DEPTH_STENCIL_READ_ONLY_OPTIMAL                :: 4;
+    SHADER_READ_ONLY_OPTIMAL                       :: 5;
+    TRANSFER_SRC_OPTIMAL                           :: 6;
+    TRANSFER_DST_OPTIMAL                           :: 7;
+    PREINITIALIZED                                 :: 8;
+    DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL     :: 1000117000;
+    DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL     :: 1000117001;
+    DEPTH_ATTACHMENT_OPTIMAL                       :: 1000241000;
+    DEPTH_READ_ONLY_OPTIMAL                        :: 1000241001;
+    STENCIL_ATTACHMENT_OPTIMAL                     :: 1000241002;
+    STENCIL_READ_ONLY_OPTIMAL                      :: 1000241003;
+    READ_ONLY_OPTIMAL                              :: 1000314000;
+    ATTACHMENT_OPTIMAL                             :: 1000314001;
+    RENDERING_LOCAL_READ                           :: 1000232000;
+    PRESENT_SRC_KHR                                :: 1000001002;
+    VIDEO_DECODE_DST_KHR                           :: 1000024000;
+    VIDEO_DECODE_SRC_KHR                           :: 1000024001;
+    VIDEO_DECODE_DPB_KHR                           :: 1000024002;
+    SHARED_PRESENT_KHR                             :: 1000111000;
+    FRAGMENT_DENSITY_MAP_OPTIMAL_EXT               :: 1000218000;
+    FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR   :: 1000164003;
+    VIDEO_ENCODE_DST_KHR                           :: 1000299000;
+    VIDEO_ENCODE_SRC_KHR                           :: 1000299001;
+    VIDEO_ENCODE_DPB_KHR                           :: 1000299002;
+    ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT           :: 1000339000;
+    TENSOR_ALIASING_ARM                            :: 1000460000;
+    VIDEO_ENCODE_QUANTIZATION_MAP_KHR              :: 1000553000;
+    ZERO_INITIALIZED_EXT                           :: 1000620000;
+    DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL_KHR :: 1000117000;
+    DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL_KHR :: 1000117001;
+    SHADING_RATE_OPTIMAL_NV                        :: 1000164003;
+    RENDERING_LOCAL_READ_KHR                       :: 1000232000;
+    DEPTH_ATTACHMENT_OPTIMAL_KHR                   :: 1000241000;
+    DEPTH_READ_ONLY_OPTIMAL_KHR                    :: 1000241001;
+    STENCIL_ATTACHMENT_OPTIMAL_KHR                 :: 1000241002;
+    STENCIL_READ_ONLY_OPTIMAL_KHR                  :: 1000241003;
+    READ_ONLY_OPTIMAL_KHR                          :: 1000314000;
+    ATTACHMENT_OPTIMAL_KHR                         :: 1000314001;
+    MAX_ENUM                                       :: 2147483647;
 }
 
 make_version :: (major: u32, minor: u32, patch: u32) -> u32 {
