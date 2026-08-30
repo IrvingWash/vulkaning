@@ -4,8 +4,6 @@
 #import "Compiler";
 #import "Process";
 #import "File";
-#import "File_Utilities";
-#import "Bindings_Generator";
 
 SDL_PATH :: "./SDL";
 
@@ -21,43 +19,6 @@ SDL_PATH :: "./SDL";
         print("Failed to build SDL library: %", error, to_standard_error = true);
         exit(1);
     }
-
-    print("Generating SDL bindings\n");
-    error = generate_bindings();
-    if error {
-        print("Failed to generate SDL bindings: %", error, to_standard_error = true);
-        exit(1);
-    }
-}
-
-generate_bindings :: () -> error: string {
-    output_filename: string;
-    options: Generate_Bindings_Options;
-
-    options.generate_library_declarations = false;
-    options.generate_compile_time_struct_checks = false;
-
-    absolute_include_path := tprint("%%/include", #filepath, SDL_PATH);
-
-    array_add(*options.include_paths, absolute_include_path);
-    array_add(*options.source_files, tprint("%/SDL3/SDL.h", absolute_include_path));
-    array_add(*options.source_files, tprint("%/SDL3/SDL_vulkan.h", absolute_include_path));
-
-    #if OS == {
-        case .LINUX;
-            output_filename = tprint("%linux.jai", #filepath);
-
-            array_add(*options.libraries, { filename = "libSDL3.so" });
-        case;
-            return tprint("Unsupport OS %", OS);
-    }
-
-    ok := generate_bindings(options, output_filename);
-    if !ok {
-        return "Bindings Generator failed";
-    }
-
-    return "";
 }
 
 build_library :: () -> error: string {

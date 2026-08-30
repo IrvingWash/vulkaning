@@ -3,6 +3,7 @@ Surface_Khr     :: #type *Surface_Khr_T;
 Physical_Device :: #type *Physical_Device_T;
 Device          :: #type *Device_T;
 Queue           :: #type *Queue_T;
+Device_Memory   :: #type *Device_Memory_T;
 
 Bool :: #type,isa u32;
 TRUE:  Bool : 1;
@@ -2261,6 +2262,7 @@ Surface_Khr_T     :: struct {};
 Physical_Device_T :: struct {};
 Device_T          :: struct {};
 Queue_T           :: struct {};
+Device_Memory_T   :: struct {};
 
 vkCreateInstance :: (
     p_create_info: *Instance_Create_Info,

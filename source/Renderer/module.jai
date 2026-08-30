@@ -10,6 +10,8 @@ Renderer :: struct {
     graphics_queue_index: int;
     device:               VK.Device;
     graphics_queue:       VK.Queue;
+
+    allocator: VMA.Allocator;
 }
 
 init :: (
@@ -26,13 +28,17 @@ init :: (
     renderer.device               = create_device(renderer.physical_device, renderer.graphics_queue_index);
     renderer.graphics_queue       = VK.get_device_queue(renderer.device, xx renderer.graphics_queue_index, 0);
 
+    renderer.allocator = init_vma(renderer);
+
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
-    VK.destroy_device(renderer.device);
+    VMA.destroy_allocator(renderer.allocator);
 
     VK.destroy_surface_khr(renderer.instance, renderer.surface);
+
+    VK.destroy_device(renderer.device);
 
     VK.destroy_instance(renderer.instance);
 
@@ -40,6 +46,23 @@ deinit :: (renderer: *Renderer) {
 }
 
 #scope_file
+
+VULKAN_API_VERSION :: #run VK.make_version(1, 4, 350);
+
+init_vma :: (renderer: Renderer) -> VMA.Allocator {
+    allocator_create_info := VMA.Allocator_Create_Info.{
+        flags              = .BUFFER_DEVICE_ADDRESS,
+        physical_device    = renderer.physical_device,
+        device             = renderer.device,
+        instance           = renderer.instance,
+        vulkan_api_version = VULKAN_API_VERSION,
+    };
+
+    result, allocator := VMA.create_allocator(*allocator_create_info);
+    assert(result == .SUCCESS);
+
+    return allocator;
+}
 
 create_device :: (physical_device: VK.Physical_Device, graphics_queue_index: int) -> VK.Device {
     { // Check feature support
@@ -102,7 +125,7 @@ create_device :: (physical_device: VK.Physical_Device, graphics_queue_index: int
 }
 
 find_graphics_queue_index :: (physical_device: VK.Physical_Device, surface: VK.Surface_Khr) -> int {
-    queue_family_properties := VK.get_physical_device_queue_family_properties_2(physical_device);
+    queue_family_properties := VK.get_physical_device_queue_family_properties_2(physical_device,, temp);
 
     the_index: int = -1;
     for qf: queue_family_properties {
@@ -125,7 +148,7 @@ find_graphics_queue_index :: (physical_device: VK.Physical_Device, surface: VK.S
 }
 
 find_physical_device :: (instance: VK.Instance) -> VK.Physical_Device {
-    result, physical_devices := VK.enumerate_physical_devices(instance);
+    result, physical_devices := VK.enumerate_physical_devices(instance,, temp);
     assert(result == .SUCCESS);
 
     the_device: VK.Physical_Device;
@@ -146,22 +169,24 @@ find_physical_device :: (instance: VK.Instance) -> VK.Physical_Device {
 create_instance :: (get_additional_instance_extensions: Additional_Instance_Extensions_Getter)  -> VK.Instance {
     application_info: VK.Application_Info = {
         p_application_name = "Vulkaning",
-        api_version = VK.make_version(1, 4, 350),
+        api_version        = VULKAN_API_VERSION,
     };
 
     extensions: [..]*u8;
+    extensions.allocator = temp;
     {
         #if DEBUG {
             array_add(*extensions, VK.Extension_Names.DEBUG_UTILS);
         }
 
-        additional_extensions := get_additional_instance_extensions();
+        additional_extensions := get_additional_instance_extensions(,, temp);
         for additional: additional_extensions {
             array_add(*extensions, additional);
         }
     }
 
     layers: [..]*u8;
+    layers.allocator = temp;
     {
         #if DEBUG {
             array_add(*layers, VK.Layer_Names.VALIDATION);
@@ -206,3 +231,4 @@ on_debug_message: VK.Pfn_Debug_Utils_Messenger_Callback_Ext : (
 
 #import "Basic";
 VK  :: #import "Jai_Vulkan";
+VMA :: #import "Vulkan_Memory_Allocator"(DEBUG = DEBUG);

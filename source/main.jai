@@ -23,7 +23,7 @@ State :: struct {
 
 main :: () {
     #if DEBUG {
-        report_memory_leaks();
+        defer report_memory_leaks();
     }
 
     setup_formatting();
@@ -35,6 +35,8 @@ main :: () {
 
     while state.is_running {
         process_input(*state);
+
+        reset_temporary_storage();
     }
 }
 
