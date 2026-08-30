@@ -18,7 +18,7 @@ init :: (
     renderer: Renderer;
 
     renderer.instance             = create_instance(get_additional_instance_extensions);
-    renderer.surface              = create_surface(window,                              renderer.instance);
+    renderer.surface              = create_surface(window, renderer.instance);
     renderer.physical_device      = find_physical_device(renderer.instance);
     renderer.graphics_queue_index = find_graphics_queue_index(renderer.physical_device, renderer.surface);
 
