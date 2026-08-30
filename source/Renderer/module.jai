@@ -8,6 +8,7 @@ Renderer :: struct {
     surface:              VK.Surface_Khr;
     physical_device:      VK.Physical_Device;
     graphics_queue_index: int;
+    device:               VK.Device;
 }
 
 init :: (
@@ -21,11 +22,14 @@ init :: (
     renderer.surface              = create_surface(window, renderer.instance);
     renderer.physical_device      = find_physical_device(renderer.instance);
     renderer.graphics_queue_index = find_graphics_queue_index(renderer.physical_device, renderer.surface);
+    renderer.device               = create_device(renderer.physical_device, renderer.graphics_queue_index);
 
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
+    VK.destroy_device(renderer.device);
+
     VK.destroy_surface_khr(renderer.instance, renderer.surface);
 
     VK.destroy_instance(renderer.instance);
@@ -34,6 +38,66 @@ deinit :: (renderer: *Renderer) {
 }
 
 #scope_file
+
+create_device :: (physical_device: VK.Physical_Device, graphics_queue_index: int) -> VK.Device {
+    { // Check feature support
+        supported_feats_1_4: VK.Physical_Device_Vulkan_1_4_Features;
+        supported_feats_1_3 := VK.Physical_Device_Vulkan_1_3_Features.{
+            p_next = *supported_feats_1_4,
+        };
+        supported_feats_1_2 := VK.Physical_Device_Vulkan_1_2_Features.{
+            p_next = *supported_feats_1_3,
+        };
+        supported_feats := VK.Physical_Device_Features_2.{
+            p_next = *supported_feats_1_2,
+        };
+
+        VK.get_physical_device_features_2(physical_device, *supported_feats);
+        assert(
+            supported_feats_1_3.dynamic_rendering
+            && supported_feats_1_3.synchronization_2
+            && supported_feats_1_2.timeline_semaphore
+        );
+    }
+
+    feats_1_4: VK.Physical_Device_Vulkan_1_4_Features;
+    feats_1_3 := VK.Physical_Device_Vulkan_1_3_Features.{
+        p_next            = *feats_1_4,
+        synchronization_2 = VK.TRUE,
+        dynamic_rendering = VK.TRUE,
+    };
+    feats_1_2 := VK.Physical_Device_Vulkan_1_2_Features.{
+        p_next             = *feats_1_3,
+        timeline_semaphore = VK.TRUE,
+    };
+    feats := VK.Physical_Device_Features_2.{
+        p_next = *feats_1_2,
+    };
+
+    queue_priorities := float.[1];
+    graphics_queue_create_info := VK.Device_Queue_Create_Info.{
+        queue_family_index = xx graphics_queue_index,
+        queue_count        = queue_priorities.count,
+        p_queue_priorities = queue_priorities.data,
+    };
+
+    extensions := *u8.[
+        VK.Extension_Names.KHR_SWAPCHAIN,
+    ];
+
+    device_create_info := VK.Device_Create_Info.{
+        p_next                     = *feats,
+        queue_create_info_count    = 1,
+        p_queue_create_infos       = *graphics_queue_create_info,
+        enabled_extension_count    = extensions.count,
+        pp_enabled_extension_names = extensions.data,
+    };
+
+    result, device := VK.create_device(physical_device, *device_create_info);
+    assert(result == .SUCCESS);
+
+    return device;
+}
 
 find_graphics_queue_index :: (physical_device: VK.Physical_Device, surface: VK.Surface_Khr) -> int {
     queue_family_properties := VK.get_physical_device_queue_family_properties_2(physical_device);

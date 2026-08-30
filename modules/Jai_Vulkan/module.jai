@@ -1,6 +1,7 @@
 Instance        :: #type *Instance_T;
 Surface_Khr     :: #type *Surface_Khr_T;
 Physical_Device :: #type *Physical_Device_T;
+Device          :: #type *Device_T;
 
 Bool :: #type,isa u32;
 TRUE:  Bool : 1;
@@ -22,7 +23,8 @@ Pfn_Reallocation_Function :: #type (
 ) -> *void #c_call;
 
 Extension_Names :: struct {
-    DEBUG_UTILS :: "VK_EXT_debug_utils";
+    DEBUG_UTILS   :: "VK_EXT_debug_utils";
+    KHR_SWAPCHAIN :: "VK_KHR_swapchain";
 }
 
 Layer_Names :: struct {
@@ -282,6 +284,198 @@ Extent_2D :: struct {
     height: u32;
 }
 
+Physical_Device_Vulkan_1_4_Features :: struct {
+    s_type                                       := Structure_Type.PHYSICAL_DEVICE_VULKAN_1_4_FEATURES;
+    p_next:                                      *void;
+    global_priority_query:                       Bool;
+    shader_subgroup_rotate:                      Bool;
+    shader_subgroup_rotate_clustered:            Bool;
+    shader_float_controls_2:                     Bool;
+    shader_expect_assume:                        Bool;
+    rectangular_lines:                           Bool;
+    bresenham_lines:                             Bool;
+    smooth_lines:                                Bool;
+    stippled_rectangular_lines:                  Bool;
+    stippled_bresenham_lines:                    Bool;
+    stippled_smooth_lines:                       Bool;
+    vertex_attribute_instance_rate_divisor:      Bool;
+    vertex_attribute_instance_rate_zero_divisor: Bool;
+    index_type_uint8:                            Bool;
+    dynamic_rendering_local_read:                Bool;
+    maintenance_5:                               Bool;
+    maintenance_6:                               Bool;
+    pipeline_protected_access:                   Bool;
+    pipeline_robustness:                         Bool;
+    host_image_copy:                             Bool;
+    push_descriptor:                             Bool;
+};
+
+Physical_Device_Vulkan_1_3_Features :: struct {
+    s_type                                                     := Structure_Type.PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+    p_next:                                                    *void;
+    robust_image_access:                                       Bool;
+    inline_uniform_block:                                      Bool;
+    descriptor_binding_inline_uniform_block_update_after_bind: Bool;
+    pipeline_creation_cache_control:                           Bool;
+    private_data:                                              Bool;
+    shader_demote_to_helper_invocation:                        Bool;
+    shader_terminate_invocation:                               Bool;
+    subgroup_size_control:                                     Bool;
+    compute_full_subgroups:                                    Bool;
+    synchronization_2:                                         Bool;
+    texture_compression_astc_hdr:                              Bool;
+    shader_zero_initialize_workgroup_memory:                   Bool;
+    dynamic_rendering:                                         Bool;
+    shader_integer_dot_product:                                Bool;
+    maintenance_4:                                             Bool;
+}
+
+Physical_Device_Vulkan_1_2_Features :: struct {
+    s_type                                                     := Structure_Type.PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    p_next:                                                    *void;
+    sampler_mirror_clamp_to_edge:                              Bool;
+    draw_indirect_count:                                       Bool;
+    storage_buffer_8_bit_access:                               Bool;
+    uniform_and_storage_buffer_8_bit_access:                   Bool;
+    storage_push_constant_8:                                   Bool;
+    shader_buffer_int64_atomics:                               Bool;
+    shader_shared_int64_atomics:                               Bool;
+    shader_float16:                                            Bool;
+    shader_int8:                                               Bool;
+    descriptor_indexing:                                       Bool;
+    shader_input_attachment_array_dynamic_indexing:            Bool;
+    shader_uniform_texel_buffer_array_dynamic_indexing:        Bool;
+    shader_storage_texel_buffer_array_dynamic_indexing:        Bool;
+    shader_uniform_buffer_array_non_uniform_indexing:          Bool;
+    shader_sampled_image_array_non_uniform_indexing:           Bool;
+    shader_storage_buffer_array_non_uniform_indexing:          Bool;
+    shader_storage_image_array_non_uniform_indexing:           Bool;
+    shaderInputAttachmentArrayNonUniformIndexing:              Bool;
+    shader_uniform_texel_buffer_array_non_uniform_indexing:    Bool;
+    shader_storage_texel_buffer_array_non_uniform_indexing:    Bool;
+    descriptor_binding_uniform_buffer_update_after_bind:       Bool;
+    descriptor_binding_sampled_image_update_after_bind:        Bool;
+    descriptor_binding_storage_image_update_after_bind:        Bool;
+    descriptor_binding_storage_buffer_update_after_bind:       Bool;
+    descriptor_binding_uniform_texel_buffer_update_after_bind: Bool;
+    descriptor_binding_storage_texel_buffer_update_after_bind: Bool;
+    descriptor_binding_update_unused_while_pending:            Bool;
+    descriptor_binding_partially_bound:                        Bool;
+    descriptor_binding_variable_descriptor_count:              Bool;
+    runtime_descriptor_array:                                  Bool;
+    sampler_filter_minmax:                                     Bool;
+    scalar_block_layout:                                       Bool;
+    imageless_framebuffer:                                     Bool;
+    uniform_buffer_standard_layout:                            Bool;
+    shader_subgroup_extended_types:                            Bool;
+    separate_depth_stencil_layouts:                            Bool;
+    host_query_reset:                                          Bool;
+    timeline_semaphore:                                        Bool;
+    buffer_device_address:                                     Bool;
+    buffer_device_address_capture_replay:                      Bool;
+    buffer_device_address_multi_device:                        Bool;
+    vulkan_memory_model:                                       Bool;
+    vulkan_memory_model_device_scope:                          Bool;
+    vulkan_memory_model_availability_visibility_chains:        Bool;
+    shader_output_viewport_index:                              Bool;
+    shader_output_layer:                                       Bool;
+    subgroup_broadcast_dynamic_id:                             Bool;
+}
+
+Physical_Device_Features_2 :: struct {
+    s_type := Structure_Type.PHYSICAL_DEVICE_FEATURES_2;
+    p_next:   *void;
+    features: Physical_Device_Features;
+}
+
+Physical_Device_Features :: struct {
+    robust_buffer_access:                          Bool;
+    full_draw_index_uint32:                        Bool;
+    image_cube_array:                              Bool;
+    independent_blend:                             Bool;
+    geometry_shader:                               Bool;
+    tessellation_shader:                           Bool;
+    sample_rate_shading:                           Bool;
+    dual_src_blend:                                Bool;
+    logic_op:                                      Bool;
+    multi_draw_indirect:                           Bool;
+    draw_indirect_first_instance:                  Bool;
+    depth_clamp:                                   Bool;
+    depth_bias_clamp:                              Bool;
+    fill_mode_non_solid:                           Bool;
+    depth_bounds:                                  Bool;
+    wide_lines:                                    Bool;
+    large_points:                                  Bool;
+    alpha_to_one:                                  Bool;
+    multi_viewport:                                Bool;
+    sampler_anisotropy:                            Bool;
+    texture_compression_etc2:                      Bool;
+    texture_compression_astc_ldr:                  Bool;
+    texture_compression_bc:                        Bool;
+    occlusion_query_precise:                       Bool;
+    pipeline_statistics_query:                     Bool;
+    vertex_pipeline_stores_and_atomics:            Bool;
+    fragment_stores_and_atomics:                   Bool;
+    shader_tessellation_and_geometry_point_size:   Bool;
+    shader_image_gather_extended:                  Bool;
+    shader_storage_image_extended_formats:         Bool;
+    shader_storage_image_multisample:              Bool;
+    shader_storage_image_read_without_format:      Bool;
+    shader_storage_image_write_without_format:     Bool;
+    shader_uniform_buffer_array_dynamic_indexing:  Bool;
+    shader_sampled_image_array_dynamic_indexing:   Bool;
+    shader_storage_buffer_array_dynamic_indexing:  Bool;
+    shader_storage_image_array_dynamic_indexing:   Bool;
+    shader_clip_distance:                          Bool;
+    shader_cull_distance:                          Bool;
+    shader_float64:                                Bool;
+    shader_int64:                                  Bool;
+    shader_int16:                                  Bool;
+    shader_resource_residency:                     Bool;
+    shader_resource_min_lod:                       Bool;
+    sparse_binding:                                Bool;
+    sparse_residency_buffer:                       Bool;
+    sparse_residency_image2d:                      Bool;
+    sparse_residency_image3d:                      Bool;
+    sparse_residency2_samples:                     Bool;
+    sparse_residency4_samples:                     Bool;
+    sparse_residency8_samples:                     Bool;
+    sparse_residency16_samples:                    Bool;
+    sparse_residency_aliased:                      Bool;
+    variable_multisample_rate:                     Bool;
+    inherited_queries:                             Bool;
+}
+
+Device_Queue_Create_Info :: struct {
+    s_type              := Structure_Type.DEVICE_QUEUE_CREATE_INFO;
+    p_next:             *void;
+    flags:              Device_Queue_Create_Flags;
+    queue_family_index: u32;
+    queue_count:        u32;
+    p_queue_priorities: *float;
+}
+
+Device_Create_Info :: struct {
+    s_type                      := Structure_Type.DEVICE_CREATE_INFO;
+    p_next:                     *void;
+    flags:                      Device_Create_Flags;
+    queue_create_info_count:    u32;
+    p_queue_create_infos:       *Device_Queue_Create_Info;
+    // enabledLayerCount is legacy and not used
+    _enabled_layer_count:       u32;
+    // ppEnabledLayerNames is legacy and not used
+    _pp_enabled_layer_names:    **u8;
+    enabled_extension_count:    u32;
+    pp_enabled_extension_names: **u8;
+    p_enabled_features:         *Physical_Device_Features;
+}
+
+Device_Queue_Create_Flags :: enum_flags u32 {
+    PROTECTED                   :: 1;
+    INTERNALLY_SYNCHRONIZED_KHR :: 4;
+    FLAG_BITS_MAX_ENUM          :: 2147483647;
+}
+
 Debug_Utils_Messenger_Create_Flags_Ext :: enum_flags u32 {}
 
 Debug_Utils_Message_Type_Flags_Ext :: enum_flags u32 {
@@ -328,6 +522,8 @@ Queue_Flags :: enum_flags u32 {
     DATA_GRAPH_ARM       :: 1024;
     FLAG_BITS_MAX_ENUM   :: 2147483647;
 }
+
+Device_Create_Flags :: enum_flags u32 {}
 
 Structure_Type :: enum u32 {
     APPLICATION_INFO                                                       :: 0;
@@ -2027,11 +2223,34 @@ get_physical_device_surface_support_khr :: inline (
     return result, cast(bool, is_supported);
 }
 
+create_device :: inline (
+    physical_device: Physical_Device,
+    p_create_info:   *Device_Create_Info,
+    p_allocator:     *Allocation_Callbacks = null,
+) -> Result, Device {
+    device: Device = ---;
+
+    result := vkCreateDevice(physical_device, p_create_info, p_allocator, *device);
+
+    return result, device;
+}
+
+destroy_device :: (
+    device:      Device,
+    p_allocator: *Allocation_Callbacks = null,
+) -> void #foreign libvulkan "vkDestroyDevice";
+
+get_physical_device_features_2 :: (
+    physical_device: Physical_Device,
+    p_features:      *Physical_Device_Features_2,
+) -> void #foreign libvulkan "vkGetPhysicalDeviceFeatures2";
+
 #scope_file
 
 Instance_T        :: struct {};
 Surface_Khr_T     :: struct {};
 Physical_Device_T :: struct {};
+Device_T          :: struct {};
 
 vkCreateInstance :: (
     p_create_info: *Instance_Create_Info,
@@ -2064,6 +2283,12 @@ vkGetPhysicalDeviceSurfaceSupportKHR :: (
     p_supported: *Bool,
 ) -> Result #foreign libvulkan;
 
+vkCreateDevice :: (
+    physical_device: Physical_Device,
+    p_create_info: *Device_Create_Info,
+    p_allocator: *Allocation_Callbacks,
+    p_device: *Device,
+) -> Result #foreign libvulkan;
 
 #if OS == {
     case .LINUX;
