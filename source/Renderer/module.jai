@@ -9,6 +9,7 @@ Renderer :: struct {
     physical_device:      VK.Physical_Device;
     graphics_queue_index: int;
     device:               VK.Device;
+    graphics_queue:       VK.Queue;
 }
 
 init :: (
@@ -23,6 +24,7 @@ init :: (
     renderer.physical_device      = find_physical_device(renderer.instance);
     renderer.graphics_queue_index = find_graphics_queue_index(renderer.physical_device, renderer.surface);
     renderer.device               = create_device(renderer.physical_device, renderer.graphics_queue_index);
+    renderer.graphics_queue       = VK.get_device_queue(renderer.device, xx renderer.graphics_queue_index, 0);
 
     return renderer;
 }

@@ -2,6 +2,7 @@ Instance        :: #type *Instance_T;
 Surface_Khr     :: #type *Surface_Khr_T;
 Physical_Device :: #type *Physical_Device_T;
 Device          :: #type *Device_T;
+Queue           :: #type *Queue_T;
 
 Bool :: #type,isa u32;
 TRUE:  Bool : 1;
@@ -2245,12 +2246,21 @@ get_physical_device_features_2 :: (
     p_features:      *Physical_Device_Features_2,
 ) -> void #foreign libvulkan "vkGetPhysicalDeviceFeatures2";
 
+get_device_queue :: inline (device: Device, queue_family_index: u32, queue_index: u32) -> Queue {
+    queue: Queue;
+
+    vkGetDeviceQueue(device, queue_family_index, queue_index, *queue);
+
+    return queue;
+}
+
 #scope_file
 
 Instance_T        :: struct {};
 Surface_Khr_T     :: struct {};
 Physical_Device_T :: struct {};
 Device_T          :: struct {};
+Queue_T           :: struct {};
 
 vkCreateInstance :: (
     p_create_info: *Instance_Create_Info,
@@ -2289,6 +2299,13 @@ vkCreateDevice :: (
     p_allocator: *Allocation_Callbacks,
     p_device: *Device,
 ) -> Result #foreign libvulkan;
+
+vkGetDeviceQueue :: (
+    device: Device,
+    queue_family_index: u32,
+    queue_index: u32,
+    p_queue: *Queue,
+) -> void #foreign libvulkan;
 
 #if OS == {
     case .LINUX;
