@@ -810,6 +810,21 @@ Semaphore_Type_Create_Info :: struct {
     initial_value:  u64;
 }
 
+Command_Pool_Create_Info :: struct {
+    s_type              := Structure_Type.COMMAND_POOL_CREATE_INFO;
+    p_next:             *void;
+    flags:              Command_Pool_Create_Flags;
+    queue_family_index: u32;
+}
+
+Command_Buffer_Allocate_Info :: struct {
+    s_type                := Structure_Type.COMMAND_BUFFER_ALLOCATE_INFO;
+    p_next:               *void;
+    command_pool:         Command_Pool;
+    level:                Command_Buffer_Level;
+    command_buffer_count: u32;
+}
+
 Stencil_Op :: enum u32 {
     KEEP                :: 0;
     ZERO                :: 1;
@@ -3501,6 +3516,19 @@ Semaphore_Type :: enum u32 {
     TIMELINE_KHR :: TIMELINE;
 }
 
+Command_Pool_Create_Flags :: enum u32 {
+    TRANSIENT            :: 1;
+    RESET_COMMAND_BUFFER :: 2;
+    PROTECTED            :: 4;
+    FLAG_BITS_MAX_ENUM   :: 2147483647;
+}
+
+Command_Buffer_Level :: enum u32 {
+    PRIMARY   :: 0;
+    SECONDARY :: 1;
+    MAX_ENUM  :: 2147483647;
+}
+
 make_version :: (major: u32, minor: u32, patch: u32) -> u32 {
     return (major << 22) | (minor << 12) | patch;
 }
@@ -3851,6 +3879,44 @@ create_graphics_pipeline :: inline (
     return result, pipeline;
 }
 
+create_command_pool :: (
+    device:        Device,
+    p_create_info: *Command_Pool_Create_Info,
+    p_allocator:   *Allocation_Callbacks = null,
+) -> Result, Command_Pool {
+    command_pool: Command_Pool = ---;
+
+    result := vkCreateCommandPool(
+        device,
+        p_create_info,
+        p_allocator,
+        *command_pool,
+    );
+
+    return result, command_pool;
+}
+
+allocate_command_buffer :: inline (
+    device: Device,
+    p_allocate_info: *Command_Buffer_Allocate_Info,
+) -> Result, Command_Buffer {
+    command_buffer: Command_Buffer = ---;
+
+    result := vkAllocateCommandBuffers(
+        device,
+        p_allocate_info,
+        *command_buffer,
+    );
+
+    return result, command_buffer;
+}
+
+destroy_command_pool :: (
+    device:      Device,
+    commandPool: Command_Pool,
+    pAllocator:  *Allocation_Callbacks = null,
+) -> void #foreign libvulkan "vkDestroyCommandPool";
+
 
 
 #scope_file
@@ -3982,6 +4048,19 @@ vkCreateGraphicsPipelines :: (
     p_create_infos:    *Graphics_Pipeline_Create_Info,
     p_allocator:       *Allocation_Callbacks,
     p_pipelines:       *Pipeline,
+) -> Result #foreign libvulkan;
+
+vkCreateCommandPool :: (
+    device:         Device,
+    p_create_info:  *Command_Pool_Create_Info,
+    p_allocator:    *Allocation_Callbacks,
+    p_command_pool: *Command_Pool,
+) -> Result #foreign libvulkan;
+
+vkAllocateCommandBuffers :: (
+    device: Device,
+    p_allocate_info: *Command_Buffer_Allocate_Info,
+    p_command_buffers: *Command_Buffer,
 ) -> Result #foreign libvulkan;
 
 #if OS == {

@@ -87,11 +87,14 @@ init :: (
 
     renderer.timeline_semaphore = create_sync_resources(renderer.device, renderer.frame_resources);
 
+    create_command_buffers(renderer.device, renderer.frame_resources, renderer.graphics_queue_index);
+
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
     for fr: renderer.frame_resources {
+        VK.destroy_command_pool(renderer.device, fr.command_pool);
         VK.destroy_semaphore(renderer.device, fr.image_acquired_semaphore);
     }
 
@@ -125,6 +128,26 @@ TARGET_SWAPCHAIN_IMAGES_COUNT :: 2;
 
 // Independet of the number of swapchain images, but should have swapchain images not less than the number of frames in flight
 MAX_FRAMES_IN_FLIGHT_COUNT :: 2;
+
+create_command_buffers :: (device: VK.Device, frame_resources: []Frame_Resources, qf_index: int) {
+    for *fr: frame_resources {
+         pool_create_info := VK.Command_Pool_Create_Info.{
+             queue_family_index = xx qf_index,
+         };
+
+         result:, fr.command_pool = VK.create_command_pool(device, *pool_create_info);
+         assert(result == .SUCCESS);
+
+         allocate_info := VK.Command_Buffer_Allocate_Info.{
+             command_pool         = fr.command_pool,
+             level                = .PRIMARY,
+             command_buffer_count = 1,
+         };
+
+         result, fr.command_buffer = VK.allocate_command_buffer(device, *allocate_info);
+         assert(result == .SUCCESS);
+    }
+}
 
 create_sync_resources :: (
     device: VK.Device,
