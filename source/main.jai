@@ -7,7 +7,7 @@
 
 SDL :: #import "SDL3";
 Renderer :: #import,dir "Renderer"()(
-    Window_Type = SDL.Window,
+    Window_Type = *SDL.Window,
     DEBUG       = DEBUG
 );
 
@@ -35,6 +35,8 @@ main :: () {
 
     while state.is_running {
         process_input(*state);
+
+        Renderer.render(*state.renderer);
 
         reset_temporary_storage();
     }

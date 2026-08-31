@@ -1,8 +1,8 @@
 #module_parameters()(Window_Type: Type, DEBUG := false);
 
 Additional_Instance_Extensions_Getter :: #type () -> [..]*u8;
-Surface_Creator :: #type (window: *Window_Type, instance: *void, allocator: *void = null) -> *void;
-Window_Pixel_Size_Getter :: #type (window: *Window_Type) -> width: s32, height: s32;
+Surface_Creator :: #type (window: Window_Type, instance: *void, allocator: *void = null) -> *void;
+Window_Pixel_Size_Getter :: #type (window: Window_Type) -> width: s32, height: s32;
 
 Renderer :: struct {
     instance:             VK.Instance;
@@ -23,6 +23,13 @@ Renderer :: struct {
 
     timeline_semaphore: VK.Semaphore;
     frame_resources:    [MAX_FRAMES_IN_FLIGHT_COUNT]Frame_Resources;
+
+    should_recreate_swapchain: bool;
+    frame_index: u64;
+    next_signal_value: u64 = MAX_FRAMES_IN_FLIGHT_COUNT + 1;
+
+    window: Window_Type;
+    get_window_pixel_size: Window_Pixel_Size_Getter;
 }
 
 Swapchain :: struct {
@@ -63,8 +70,11 @@ init :: (
 ) -> Renderer {
     renderer: Renderer;
 
+    renderer.window = window;
+    renderer.get_window_pixel_size = get_window_pixel_size;
+
     renderer.instance             = create_instance(get_additional_instance_extensions);
-    renderer.surface              = create_surface(window, renderer.instance);
+    renderer.surface              = create_surface(renderer.window, renderer.instance);
     renderer.physical_device      = find_physical_device(renderer.instance, renderer.surface);
     renderer.graphics_queue_index = find_graphics_queue_index(renderer.physical_device, renderer.surface);
     renderer.device               = create_device(renderer.physical_device, renderer.graphics_queue_index);
@@ -74,8 +84,8 @@ init :: (
         renderer.physical_device,
         renderer.surface,
         renderer.device,
-        window,
-        get_window_pixel_size,
+        renderer.window,
+        renderer.get_window_pixel_size,
         null,
     );
 
@@ -119,6 +129,67 @@ deinit :: (renderer: *Renderer) {
     VK.destroy_instance(renderer.instance);
 
     renderer.* = {};
+}
+
+render :: (renderer: *Renderer) {
+    if renderer.should_recreate_swapchain {
+        VK.device_wait_idle(renderer.device);
+        destroy_swapchain(renderer.device, *renderer.swapchain);
+        renderer.swapchain = create_swapchain(
+            renderer.physical_device,
+            renderer.surface,
+            renderer.device,
+            renderer.window,
+            renderer.get_window_pixel_size,
+            null,
+        );
+        renderer.should_recreate_swapchain = false;
+    }
+
+    frame_resources_index := renderer.frame_index % MAX_FRAMES_IN_FLIGHT_COUNT;
+    renderer.frame_index += 1;
+    signal_value := renderer.next_signal_value;
+    renderer.next_signal_value += 1;
+    wait_value := signal_value - MAX_FRAMES_IN_FLIGHT_COUNT;
+
+    wait_info := VK.Semaphore_Wait_Info.{
+        semaphore_count = 1,
+        p_semaphores    = *renderer.timeline_semaphore,
+        p_values        = *wait_value,
+    };
+
+    VK.wait_semaphores(renderer.device, *wait_info, U64_MAX);
+
+    fr := renderer.frame_resources[frame_resources_index];
+
+    result := VK.reset_command_pool(renderer.device, fr.command_pool, 0);
+    assert(result == .SUCCESS);
+
+    image_acquired_semaphore := fr.image_acquired_semaphore;
+    image_index: u32;
+
+    image_acquire_result := VK.acquire_next_image_khr(
+        renderer.device,
+        renderer.swapchain.swapchain,
+        U64_MAX,
+        image_acquired_semaphore,
+        null,
+    );
+    if image_acquire_result == {
+        case .ERROR_OUT_OF_DATE_KHR;
+            renderer.should_recreate_swapchain = true;
+            return;
+        case .SUBOPTIMAL_KHR;
+            renderer.should_recreate_swapchain = true;
+        case;
+            assert(image_acquire_result == .SUCCESS);
+    }
+
+    cmd_begin_info := VK.Command_Buffer_Begin_Info.{
+        flags = .ONE_TIME_SUBMIT,
+    };
+    result = VK.begin_command_buffer(fr.command_buffer, *cmd_begin_info);
+    assert(result == .SUCCESS);
 }
 
 
@@ -426,7 +497,7 @@ create_swapchain :: (
     physical_device:       VK.Physical_Device,
     surface:               VK.Surface_Khr,
     device:                VK.Device,
-    window:                *Window_Type,
+    window:                Window_Type,
     get_window_pixel_size: Window_Pixel_Size_Getter,
     old_swapchain:         VK.Swapchain_Khr,
 ) -> Swapchain {

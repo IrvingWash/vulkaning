@@ -17,6 +17,8 @@ Render_Pass           :: #type *Render_Pass_T;
 Pipeline_Cache        :: #type *Pipeline_Cache_T;
 Command_Pool          :: #type *Command_Pool_T;
 Command_Buffer        :: #type *Command_Buffer_T;
+Fence                 :: #type *Fence_T;
+Framebuffer           :: #type *Framebuffer_T;
 
 Bool :: #type,isa u32;
 TRUE:  Bool : 1;
@@ -825,6 +827,33 @@ Command_Buffer_Allocate_Info :: struct {
     command_buffer_count: u32;
 }
 
+Semaphore_Wait_Info :: struct {
+    s_type := Structure_Type.SEMAPHORE_WAIT_INFO;
+    p_next: *void;
+    flags: Semaphore_Wait_Flags;
+    semaphore_count: u32;
+    p_semaphores: *Semaphore;
+    p_values: *u64;
+};
+
+Command_Buffer_Begin_Info :: struct {
+    s_type              := Structure_Type.COMMAND_BUFFER_BEGIN_INFO;
+    p_next:             *void;
+    flags:              Command_Buffer_Usage_Flags;
+    p_inheritance_info: *Command_Buffer_Inheritance_Info;
+}
+
+Command_Buffer_Inheritance_Info :: struct {
+    s_type                  := Structure_Type.COMMAND_BUFFER_INHERITANCE_INFO;
+    p_next:                 *void;
+    render_pass:            Render_Pass;
+    subpass:                u32;
+    framebuffer:            Framebuffer;
+    occlusion_query_enable: Bool;
+    query_flags:            Query_Control_Flags;
+    pipeline_statistics:    Query_Pipeline_Statistic_Flags;
+}
+
 Stencil_Op :: enum u32 {
     KEEP                :: 0;
     ZERO                :: 1;
@@ -1142,6 +1171,45 @@ Pipeline_Create_Flags :: enum_flags u32 {
     CREATE_NO_PROTECTED_ACCESS_EXT                                  :: 134217728;
     CREATE_PROTECTED_ACCESS_ONLY_EXT                                :: 1073741824;
     CREATE_FLAG_BITS_MAX_ENUM                                       :: 2147483647;
+}
+
+Semaphore_Wait_Flags :: enum_flags u32 {
+    ANY     :: 0x00000001;
+    ANY_KHR :: ANY;
+};
+
+Command_Pool_Reset_Flags :: enum_flags u32 {
+    RELEASE_RESOURCES :: 0x00000001;
+};
+
+Command_Buffer_Usage_Flags :: enum_flags u32 {
+    ONE_TIME_SUBMIT      :: 1;
+    RENDER_PASS_CONTINUE :: 2;
+    SIMULTANEOUS_USE     :: 4;
+    FLAG_BITS_MAX_ENUM   :: 2147483647;
+}
+
+Query_Pipeline_Statistic_Flags :: enum_flags u32 {
+    INPUT_ASSEMBLY_VERTICES                    :: 1;
+    INPUT_ASSEMBLY_PRIMITIVES                  :: 2;
+    VERTEX_SHADER_INVOCATIONS                  :: 4;
+    GEOMETRY_SHADER_INVOCATIONS                :: 8;
+    GEOMETRY_SHADER_PRIMITIVES                 :: 16;
+    CLIPPING_INVOCATIONS                       :: 32;
+    CLIPPING_PRIMITIVES                        :: 64;
+    FRAGMENT_SHADER_INVOCATIONS                :: 128;
+    TESSELLATION_CONTROL_SHADER_PATCHES        :: 256;
+    TESSELLATION_EVALUATION_SHADER_INVOCATIONS :: 512;
+    COMPUTE_SHADER_INVOCATIONS                 :: 1024;
+    TASK_SHADER_INVOCATIONS_EXT                :: 2048;
+    MESH_SHADER_INVOCATIONS_EXT                :: 4096;
+    CLUSTER_CULLING_SHADER_INVOCATIONS_HUAWEI  :: 8192;
+    FLAG_BITS_MAX_ENUM                         :: 2147483647;
+}
+
+Query_Control_Flags :: enum_flags u32 {
+    PRECISE            :: 1;
+    FLAG_BITS_MAX_ENUM :: 2147483647;
 }
 
 Image_Create_Flags :: enum u32 {
@@ -3919,6 +3987,44 @@ destroy_command_pool :: (
 
 device_wait_idle :: (device: Device) -> Result #foreign libvulkan "vkDeviceWaitIdle";
 
+wait_semaphores :: (
+    device:      Device,
+    p_wait_info: *Semaphore_Wait_Info,
+    timeout:     u64,
+) -> Result #foreign libvulkan "vkWaitSemaphores";
+
+reset_command_pool :: (
+    device:       Device,
+    command_pool: Command_Pool,
+    flags:        Command_Pool_Reset_Flags,
+) -> Result #foreign libvulkan "vkResetCommandPool";
+
+acquire_next_image_khr :: inline (
+    device:    Device,
+    swapchain: Swapchain_Khr,
+    timeout:   u64,
+    semaphore: Semaphore,
+    fence:     Fence,
+) -> Result, u32 {
+    index: u32;
+
+    result := vkAcquireNextImageKHR(
+        device,
+        swapchain,
+        timeout,
+        semaphore,
+        fence,
+        *index,
+    );
+
+    return result, index;
+}
+
+begin_command_buffer :: (
+    command_buffer: Command_Buffer,
+    p_begin_info:   *Command_Buffer_Begin_Info,
+) -> Result #foreign libvulkan "vkBeginCommandBuffer";
+
 
 
 #scope_file
@@ -3942,6 +4048,8 @@ Render_Pass_T           :: struct {}
 Pipeline_Cache_T        :: struct {}
 Command_Pool_T          :: struct {}
 Command_Buffer_T        :: struct {}
+Fence_T                 :: struct {}
+Framebuffer_T           :: struct {};
 
 vkCreateInstance :: (
     p_create_info: *Instance_Create_Info,
@@ -4060,9 +4168,18 @@ vkCreateCommandPool :: (
 ) -> Result #foreign libvulkan;
 
 vkAllocateCommandBuffers :: (
-    device: Device,
-    p_allocate_info: *Command_Buffer_Allocate_Info,
+    device:            Device,
+    p_allocate_info:   *Command_Buffer_Allocate_Info,
     p_command_buffers: *Command_Buffer,
+) -> Result #foreign libvulkan;
+
+vkAcquireNextImageKHR :: (
+    device:        Device,
+    swapchain:     Swapchain_Khr,
+    timeout:       u64,
+    semaphore:     Semaphore,
+    fence:         Fence,
+    p_image_index: *u32,
 ) -> Result #foreign libvulkan;
 
 #if OS == {

@@ -43,6 +43,7 @@ BUILD_ENTRY_FILE :: #run tprint("%source/main.jai", #filepath);
 
     output_path := tprint("%bin/%", #filepath, config.optimization_type);
 
+    print("Compiling shaders...\n");
     error = compile_shaders(config.optimization_type);
     if error {
         log_error("Failed to build: %", error);
@@ -50,6 +51,7 @@ BUILD_ENTRY_FILE :: #run tprint("%source/main.jai", #filepath);
         return;
     }
 
+    print("Building...\n");
     error = build(build_options_dc, config, output_path);
     if error {
         log_error("Failed to build: %", error);
