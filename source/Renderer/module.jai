@@ -93,6 +93,9 @@ init :: (
 }
 
 deinit :: (renderer: *Renderer) {
+    result := VK.device_wait_idle(renderer.device);
+    assert(result == .SUCCESS);
+
     for fr: renderer.frame_resources {
         VK.destroy_command_pool(renderer.device, fr.command_pool);
         VK.destroy_semaphore(renderer.device, fr.image_acquired_semaphore);

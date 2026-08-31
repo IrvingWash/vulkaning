@@ -3917,6 +3917,8 @@ destroy_command_pool :: (
     pAllocator:  *Allocation_Callbacks = null,
 ) -> void #foreign libvulkan "vkDestroyCommandPool";
 
+device_wait_idle :: (device: Device) -> Result #foreign libvulkan "vkDeviceWaitIdle";
+
 
 
 #scope_file
