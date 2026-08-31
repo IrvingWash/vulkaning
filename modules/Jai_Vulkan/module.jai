@@ -15,6 +15,8 @@ Pipeline_Layout       :: #type *Pipeline_Layout_T;
 Sample_Mask           :: #type *Sample_Mask_T;
 Render_Pass           :: #type *Render_Pass_T;
 Pipeline_Cache        :: #type *Pipeline_Cache_T;
+Command_Pool          :: #type *Command_Pool_T;
+Command_Buffer        :: #type *Command_Buffer_T;
 
 Bool :: #type,isa u32;
 TRUE:  Bool : 1;
@@ -799,6 +801,13 @@ Pipeline_Tessellation_State_Create_Info :: struct {
     p_next:               *void;
     flags:                Pipeline_Tessellation_State_Create_Flags;
     patch_control_points: u32;
+}
+
+Semaphore_Type_Create_Info :: struct {
+    s_type          := Structure_Type.SEMAPHORE_TYPE_CREATE_INFO;
+    p_next:         *void;
+    semaphore_type: Semaphore_Type;
+    initial_value:  u64;
 }
 
 Stencil_Op :: enum u32 {
@@ -3485,6 +3494,13 @@ Dynamic_State :: enum u32 {
     MAX_ENUM                                :: 2147483647;
 }
 
+Semaphore_Type :: enum u32 {
+    BINARY       :: 0;
+    TIMELINE     :: 1;
+    BINARY_KHR   :: BINARY;
+    TIMELINE_KHR :: TIMELINE;
+}
+
 make_version :: (major: u32, minor: u32, patch: u32) -> u32 {
     return (major << 22) | (minor << 12) | patch;
 }
@@ -3855,7 +3871,9 @@ Pipeline_T              :: struct {}
 Pipeline_Layout_T       :: struct {}
 Sample_Mask_T           :: struct {}
 Render_Pass_T           :: struct {}
-Pipeline_Cache_T        :: struct {};
+Pipeline_Cache_T        :: struct {}
+Command_Pool_T          :: struct {}
+Command_Buffer_T        :: struct {}
 
 vkCreateInstance :: (
     p_create_info: *Instance_Create_Info,

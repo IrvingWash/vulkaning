@@ -20,6 +20,9 @@ Renderer :: struct {
     allocator: VMA.Allocator;
 
     graphics_pipeline: Graphics_Pipeline;
+
+    timeline_semaphore: VK.Semaphore;
+    frame_resources:    [MAX_FRAMES_IN_FLIGHT_COUNT]Frame_Resources;
 }
 
 Swapchain :: struct {
@@ -44,6 +47,12 @@ Depth :: struct {
 Graphics_Pipeline :: struct {
     layout:   VK.Pipeline_Layout;
     pipeline: VK.Pipeline;
+}
+
+Frame_Resources :: struct {
+    command_pool:             VK.Command_Pool;
+    command_buffer:           VK.Command_Buffer;
+    image_acquired_semaphore: VK.Semaphore;
 }
 
 init :: (
@@ -76,10 +85,18 @@ init :: (
 
     renderer.graphics_pipeline = create_graphics_pipeline(renderer.device, renderer.swapchain);
 
+    renderer.timeline_semaphore = create_sync_resources(renderer.device, renderer.frame_resources);
+
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
+    for fr: renderer.frame_resources {
+        VK.destroy_semaphore(renderer.device, fr.image_acquired_semaphore);
+    }
+
+    VK.destroy_semaphore(renderer.device, renderer.timeline_semaphore);
+
     VK.destroy_pipeline(renderer.device, renderer.graphics_pipeline.pipeline);
     VK.destroy_pipeline_layout(renderer.device, renderer.graphics_pipeline.layout);
 
@@ -103,6 +120,39 @@ deinit :: (renderer: *Renderer) {
 #scope_file
 
 VULKAN_API_VERSION :: #run VK.make_version(1, 4, 350);
+
+TARGET_SWAPCHAIN_IMAGES_COUNT :: 2;
+
+// Independet of the number of swapchain images, but should have swapchain images not less than the number of frames in flight
+MAX_FRAMES_IN_FLIGHT_COUNT :: 2;
+
+create_sync_resources :: (
+    device: VK.Device,
+    frame_resources: []Frame_Resources,
+) -> timeline_semaphore: VK.Semaphore {
+    timeline_semaphore: VK.Semaphore;
+    {
+        type_create_info := VK.Semaphore_Type_Create_Info.{
+            semaphore_type = .TIMELINE,
+            initial_value  = MAX_FRAMES_IN_FLIGHT_COUNT,
+        };
+
+        create_info := VK.Semaphore_Create_Info.{
+            p_next = *type_create_info,
+        };
+
+        result:, timeline_semaphore = VK.create_semaphore(device, *create_info);
+        assert(result == .SUCCESS);
+    }
+
+    for *fr: frame_resources {
+        create_info: VK.Semaphore_Create_Info;
+        result:, fr.image_acquired_semaphore = VK.create_semaphore(device, *create_info);
+        assert(result == .SUCCESS);
+    }
+
+    return timeline_semaphore;
+}
 
 create_graphics_pipeline :: (device: VK.Device, swapchain: Swapchain) -> Graphics_Pipeline {
     graphics_pipeline: Graphics_Pipeline;
@@ -359,8 +409,7 @@ create_swapchain :: (
     result, surface_capabilities := VK.get_physical_device_surface_capabilities_khr(physical_device, surface);
     assert(result == .SUCCESS);
 
-    SWAPCHAIN_IMAGES_COUNT :: 2;
-    image_count_to_request := max(SWAPCHAIN_IMAGES_COUNT, surface_capabilities.min_image_count);
+    image_count_to_request := max(TARGET_SWAPCHAIN_IMAGES_COUNT, surface_capabilities.min_image_count);
     if surface_capabilities.max_image_count > 0 {
         image_count_to_request = min(image_count_to_request, surface_capabilities.max_image_count);
     }
