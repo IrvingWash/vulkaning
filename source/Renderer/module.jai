@@ -18,6 +18,9 @@ Renderer :: struct {
 
     // Graphics queue family index
     gfx_qfi: u32;
+
+    device:    VK.Device;
+    gfx_queue: VK.Queue;
 }
 
 init :: (
@@ -39,10 +42,16 @@ init :: (
 
     renderer.gfx_qfi = find_graphics_queue_family_index(renderer.physical_device, renderer.surface);
 
+    renderer.device = create_device(renderer.physical_device, renderer.gfx_qfi);
+
+    renderer.gfx_queue = VK.get_device_queue(renderer.device, renderer.gfx_qfi, 0);
+
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
+    VK.destroy_device(renderer.device);
+
     VK.destroy_surface_khr(renderer.instance, renderer.surface);
 
     VK.destroy_instance(renderer.instance);
@@ -60,6 +69,61 @@ VULKAN_API_VERSION :: #run VK.make_version(1, 4, 350);
 
 ASSERT_SUCCESS :: (name: string) #expand {
     assert(`result == .SUCCESS, name);
+}
+
+create_device :: (physical_device: VK.Physical_Device, gfx_qfi: u32) -> VK.Device {
+    {
+        supported_features_14: VK.Physical_Device_Vulkan_1_4_Features;
+        supported_features_13  := VK.Physical_Device_Vulkan_1_3_Features.{ p_next = *supported_features_14 };
+        supported_features_12  := VK.Physical_Device_Vulkan_1_2_Features.{ p_next = *supported_features_13 };
+        supported_features     := VK.Physical_Device_Features_2.{ p_next = *supported_features_12 };
+        VK.get_physical_device_features_2(physical_device, *supported_features);
+
+        assert(
+            supported_features_13.dynamic_rendering
+            && supported_features_13.synchronization_2
+            && supported_features_12.timeline_semaphore,
+            "One of the required features is not supported",
+        );
+    }
+
+    requested_features_14: VK.Physical_Device_Vulkan_1_4_Features;
+    requested_features_13 := VK.Physical_Device_Vulkan_1_3_Features.{
+        p_next            = *requested_features_14,
+        synchronization_2 = VK.TRUE,
+        dynamic_rendering = VK.TRUE,
+    };
+    requested_features_12 := VK.Physical_Device_Vulkan_1_2_Features.{
+        p_next             = *requested_features_13,
+        timeline_semaphore = VK.TRUE,
+    };
+    requested_features := VK.Physical_Device_Features_2.{ p_next = *requested_features_12 };
+
+    queue_priorities := float.[1];
+    device_queue_create_infos := VK.Device_Queue_Create_Info.[
+        {
+            queue_family_index = gfx_qfi,
+            queue_count        = 1,
+            p_queue_priorities = queue_priorities.data,
+        },
+    ];
+
+    extensions: [..]*u8;
+    extensions.allocator = temp;
+    array_add(*extensions, VK.Extension_Names.KHR_SWAPCHAIN);
+
+    device_create_info := VK.Device_Create_Info.{
+        p_next                     = *requested_features,
+        queue_create_info_count    = device_queue_create_infos.count,
+        p_queue_create_infos       = device_queue_create_infos.data,
+        enabled_extension_count    = xx extensions.count,
+        pp_enabled_extension_names = extensions.data,
+    };
+
+    result, device := VK.create_device(physical_device, *device_create_info);
+    ASSERT_SUCCESS("Device");
+
+    return device;
 }
 
 find_graphics_queue_family_index :: (physical_device: VK.Physical_Device, surface: VK.Surface_Khr) -> u32 {
@@ -127,10 +191,8 @@ create_instance :: (get_additional_extensions: Additional_Instance_Extensions_Ge
 
     layers: [..]*u8;
     layers.allocator = temp;
-    {
-        #if DEBUG {
-            array_add(*layers, VK.Layer_Names.VALIDATION);
-        }
+    #if DEBUG {
+        array_add(*layers, VK.Layer_Names.VALIDATION);
     }
 
     instance_create_info := VK.Instance_Create_Info.{
