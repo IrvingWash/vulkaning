@@ -26,6 +26,7 @@ Renderer :: struct {
     allocator: VMA.Allocator;
 
     swapchain_info: Swapchain_Info;
+    depth_info:     Depth_Info;
 }
 
 Swapchain_Info :: struct {
@@ -35,6 +36,11 @@ Swapchain_Info :: struct {
     image_views: [..]VK.Image_View;
 
     render_complete_semaphores: [..]VK.Semaphore;
+}
+
+Depth_Info :: struct {
+    image:      VK.Image;
+    allocation: VMA.Allocation;
 }
 
 init :: (
@@ -72,10 +78,14 @@ init :: (
         should_check_format = true,
     );
 
+    renderer.depth_info = create_depth(renderer.swapchain_info.config.image_extent, renderer.allocator);
+
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
+    destroy_depth(renderer.allocator, *renderer.depth_info);
+
     destroy_swapchain(renderer.device, *renderer.swapchain_info);
 
     VMA.destroy_allocator(renderer.allocator);
@@ -98,9 +108,46 @@ render :: (renderer: *Renderer) {}
 VULKAN_API_VERSION :: #run VK.make_version(1, 4, 350);
 
 SURFACE_FORMAT :: VK.Format.B8G8R8A8_SRGB;
+DEPTH_FORMAT   :: VK.Format.D32_SFLOAT;
 
 ASSERT_SUCCESS :: (name: string) #expand {
     assert(`result == .SUCCESS, name);
+}
+
+destroy_depth :: (allocator: VMA.Allocator, depth_info: *Depth_Info) {
+    VMA.destroy_image(allocator, depth_info.image, depth_info.allocation);
+
+    depth_info.* = {};
+}
+
+create_depth :: (swapchain_image_extent: VK.Extent_2D, allocator: VMA.Allocator) -> Depth_Info {
+    depth_info: Depth_Info;
+
+    image_create_info := VK.Image_Create_Info.{
+        image_type = ._2D,
+        format     = DEPTH_FORMAT,
+        extent     = {
+            width  = swapchain_image_extent.width,
+            height = swapchain_image_extent.height,
+            depth  = 1,
+        },
+        mip_levels     = 1,
+        array_layers   = 1,
+        samples        = ._1,
+        tiling         = .OPTIMAL,
+        usage          = .DEPTH_STENCIL_ATTACHMENT,
+        initial_layout = .UNDEFINED,
+    };
+
+    allocation_create_info := VMA.Allocation_Create_Info.{
+        flags = .DEDICATED_MEMORY,
+        usage = .AUTO,
+    };
+
+    result:, depth_info.image, depth_info.allocation = VMA.create_image(allocator, *image_create_info, *allocation_create_info);
+    ASSERT_SUCCESS("Depth image");
+
+    return depth_info;
 }
 
 destroy_swapchain :: (device: VK.Device, swapchain_info: *Swapchain_Info) {
