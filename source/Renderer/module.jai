@@ -115,6 +115,28 @@ ASSERT_SUCCESS :: (name: string) #expand {
     assert(`result == .SUCCESS, name);
 }
 
+create_shader_module :: (device: VK.Device, name: string) -> VK.Shader_Module {
+    path := tprint(
+        "%/shaders/%",
+        path_strip_filename(get_path_of_running_executable()),
+        name,
+    );
+
+    file_content, ok := read_entire_file(path);
+    assert(ok, "Failed to read file from '%'", path);
+    defer free(file_content);
+
+    shader_module_create_info := VK.Shader_Module_Create_Info.{
+        code_size = xx (file_content.count * size_of(u8)),
+        p_code    = cast(*u32, file_content.data),
+    };
+
+    result, shader_module := VK.create_shader_module(device, *shader_module_create_info);
+    ASSERT_SUCCESS("Shader module");
+
+    return shader_module;
+}
+
 destroy_depth :: (device: VK.Device, allocator: VMA.Allocator, depth_info: *Depth_Info) {
     VK.destroy_image_view(device, depth_info.image_view);
 
@@ -466,5 +488,6 @@ create_instance :: (get_additional_extensions: Additional_Instance_Extensions_Ge
 #import "Math";
 #import "System";
 #import "String";
+#import "File";
 VK  :: #import "Jai_Vulkan";
 VMA :: #import "Vulkan_Memory_Allocator"(DEBUG = DEBUG);
