@@ -31,6 +31,10 @@ Renderer :: struct {
 
     timeline_semaphore: VK.Semaphore;
     frame_resources_list: [MAX_FRAMES_IN_FLIGHT_COUNT]Frame_Resources;
+
+    should_recreate_swapchain: bool;
+    frame_index:               u64;
+    next_signal_value:         u64 = MAX_FRAMES_IN_FLIGHT_COUNT + 1; // I guess this is because we initialize the timeline_semaphore with MAX_FRAMES_IN_FLIGHT_COUNT
 }
 
 Swapchain_Info :: struct {
@@ -130,7 +134,68 @@ deinit :: (renderer: *Renderer) {
     renderer.* = {};
 }
 
-render :: (renderer: *Renderer) {}
+render :: (renderer: *Renderer) {
+    if renderer.should_recreate_swapchain {
+        VK.device_wait_idle(renderer.device);
+
+        destroy_swapchain(renderer.device, *renderer.swapchain_info);
+        destroy_depth(renderer.device, renderer.allocator, *renderer.depth_info);
+
+        renderer.swapchain_info = create_swapchain(
+            renderer.physical_device,
+            renderer.surface,
+            renderer.device,
+            renderer.window,
+            renderer.get_window_pixel_size,
+        );
+
+        renderer.depth_info = create_depth(
+            renderer.device,
+            renderer.swapchain_info.config.image_extent,
+            renderer.allocator,
+        );
+
+        renderer.should_recreate_swapchain = false;
+    }
+
+    frame_resources_index := renderer.frame_index % MAX_FRAMES_IN_FLIGHT_COUNT;
+    renderer.frame_index += 1;
+
+    signal_value := renderer.next_signal_value;
+    renderer.next_signal_value += 1;
+
+    // Waiting for a signal of MAX_FRAMES_IN_FLIGHT_COUNT ago
+    wait_value := signal_value - MAX_FRAMES_IN_FLIGHT_COUNT;
+
+    wait_info := VK.Semaphore_Wait_Info.{
+        semaphore_count = 1,
+        p_semaphores    = *renderer.timeline_semaphore,
+        p_values        = *wait_value,
+    };
+    VK.wait_semaphores(renderer.device, *wait_info, U64_MAX);
+
+    frame_resources := renderer.frame_resources_list[frame_resources_index];
+
+    result := VK.reset_command_pool(renderer.device, frame_resources.command_pool, 0);
+    ASSERT_SUCCESS("Reset command pool");
+
+    result =, image_index := VK.acquire_next_image_khr(
+        renderer.device,
+        renderer.swapchain_info.swapchain,
+        U64_MAX,
+        frame_resources.image_acquired_semaphore,
+        null,
+    );
+
+    if result == .ERROR_OUT_OF_DATE_KHR {
+        renderer.should_recreate_swapchain = true;
+        return;
+    } else if result == .SUBOPTIMAL_KHR {
+        renderer.should_recreate_swapchain = true;
+    } else {
+        ASSERT_SUCCESS("Acquire next image");
+    }
+}
 
 
 
