@@ -10,7 +10,8 @@ Surface_Creator :: #type (
 ) -> ok: bool, VK.Surface_Khr;
 
 Renderer :: struct {
-    window: Window_Type;
+    window:                Window_Type;
+    get_window_pixel_size: Window_Pixel_Size_Getter;
 
     instance:        VK.Instance;
     surface:         VK.Surface_Khr;
@@ -23,6 +24,17 @@ Renderer :: struct {
     gfx_queue: VK.Queue;
 
     allocator: VMA.Allocator;
+
+    swapchain_info: Swapchain_Info;
+}
+
+Swapchain_Info :: struct {
+    swapchain:   VK.Swapchain_Khr;
+    config:      VK.Swapchain_Create_Info_Khr;
+    images:      [..]VK.Image;
+    image_views: [..]VK.Image_View;
+
+    render_complete_semaphores: [..]VK.Semaphore;
 }
 
 init :: (
@@ -34,6 +46,7 @@ init :: (
     renderer: Renderer;
 
     renderer.window = window;
+    renderer.get_window_pixel_size = get_window_pixel_size;
 
     renderer.instance = create_instance(get_additional_instance_extensions);
 
@@ -50,10 +63,21 @@ init :: (
 
     renderer.allocator = init_vma(renderer.physical_device, renderer.device, renderer.instance);
 
+    renderer.swapchain_info = create_swapchain(
+        renderer.physical_device,
+        renderer.surface,
+        renderer.device,
+        renderer.window,
+        renderer.get_window_pixel_size,
+        should_check_format = true,
+    );
+
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
+    destroy_swapchain(renderer.device, *renderer.swapchain_info);
+
     VMA.destroy_allocator(renderer.allocator);
 
     VK.destroy_surface_khr(renderer.instance, renderer.surface);
@@ -73,8 +97,122 @@ render :: (renderer: *Renderer) {}
 
 VULKAN_API_VERSION :: #run VK.make_version(1, 4, 350);
 
+SURFACE_FORMAT :: VK.Format.B8G8R8A8_SRGB;
+
 ASSERT_SUCCESS :: (name: string) #expand {
     assert(`result == .SUCCESS, name);
+}
+
+destroy_swapchain :: (device: VK.Device, swapchain_info: *Swapchain_Info) {
+    for semaphore: swapchain_info.render_complete_semaphores {
+        VK.destroy_semaphore(device, semaphore);
+    }
+    array_free(swapchain_info.render_complete_semaphores);
+
+    for image_view: swapchain_info.image_views {
+        VK.destroy_image_view(device, image_view);
+    }
+    array_free(swapchain_info.image_views);
+
+    array_free(swapchain_info.images);
+
+    VK.destroy_swapchain_khr(device, swapchain_info.swapchain);
+
+    swapchain_info.* = {};
+}
+
+create_swapchain :: (
+    physical_device:       VK.Physical_Device,
+    surface:               VK.Surface_Khr,
+    device:                VK.Device,
+    window:                Window_Type,
+    get_window_pixel_size: Window_Pixel_Size_Getter,
+    should_check_format    := false,
+) -> Swapchain_Info {
+    swapchain_info: Swapchain_Info;
+
+    { // The swapchain itself
+        result, surface_capabilities := VK.get_physical_device_surface_capabilities_khr(physical_device, surface);
+        ASSERT_SUCCESS("Surface capabilities");
+
+        desired_image_count := max(2, surface_capabilities.min_image_count); // @Todo: put 2 into a constant
+        if surface_capabilities.max_image_count > 0 {
+            desired_image_count = min(desired_image_count, surface_capabilities.max_image_count);
+        }
+
+        if should_check_format {
+            supports_desired_format: bool;
+            result, supported_formats := VK.get_physical_device_surface_formats_khr(physical_device, surface,, temp);
+            ASSERT_SUCCESS("Supported surface formats");
+            for supported_format: supported_formats {
+                if supported_format.format == SURFACE_FORMAT {
+                    supports_desired_format = true;
+                    break;
+                }
+            }
+            assert(supports_desired_format, "The desired surface format is not supported");
+        }
+
+        image_extent: VK.Extent_2D;
+        if surface_capabilities.current_extent.width != U32_MAX {
+            image_extent = surface_capabilities.current_extent;
+        } else {
+            width, height := get_window_pixel_size(window);
+
+            image_extent.width = clamp(cast(u32, width), surface_capabilities.min_image_extent.width, surface_capabilities.max_image_extent.width);
+            image_extent.height = clamp(cast(u32, height), surface_capabilities.min_image_extent.height, surface_capabilities.max_image_extent.height);
+        }
+
+        swapchain_info.config = {
+            surface            = surface,
+            min_image_count    = xx desired_image_count,
+            image_format       = SURFACE_FORMAT,
+            image_color_space  = .SRGB_NONLINEAR_KHR,
+            image_extent       = image_extent,
+            image_array_layers = 1,
+            image_usage        = .COLOR_ATTACHMENT,
+            pre_transform      = surface_capabilities.current_transform,
+            composite_alpha    = .OPAQUE_KHR,
+            present_mode       = .FIFO_KHR,
+        };
+
+        result, swapchain_info.swapchain = VK.create_swapchain_khr(device, *swapchain_info.config);
+        ASSERT_SUCCESS("Swapchain");
+    }
+
+    result:, swapchain_info.images = VK.get_swapchain_images_khr(device, swapchain_info.swapchain);
+    ASSERT_SUCCESS("Swapchain images");
+
+    array_resize(*swapchain_info.image_views, swapchain_info.images.count);
+    for image: swapchain_info.images {
+        image_view_create_info := VK.Image_View_Create_Info.{
+            image             = image,
+            view_type         = ._2D,
+            format            = swapchain_info.config.image_format,
+            subresource_range = {
+                aspect_mask      = .COLOR,
+                base_mip_level   = 0,
+                level_count      = 1,
+                base_array_layer = 0,
+                layer_count      = 1,
+            },
+        };
+
+        result, image_view := VK.create_image_view(device, *image_view_create_info);
+        ASSERT_SUCCESS("Swapchain image view");
+
+        swapchain_info.image_views[it_index] = image_view;
+    }
+
+    array_resize(*swapchain_info.render_complete_semaphores, swapchain_info.images.count);
+    for *semaphore: swapchain_info.render_complete_semaphores {
+        semaphore_create_info: VK.Semaphore_Create_Info;
+
+        result:, semaphore.* = VK.create_semaphore(device, *semaphore_create_info);
+        ASSERT_SUCCESS("Render complete semaphore");
+    }
+
+    return swapchain_info;
 }
 
 init_vma :: (physical_device: VK.Physical_Device, device: VK.Device, instance: VK.Instance) -> VMA.Allocator {
@@ -108,17 +246,17 @@ create_device :: (physical_device: VK.Physical_Device, gfx_qfi: u32) -> VK.Devic
         );
     }
 
-    requested_features_14: VK.Physical_Device_Vulkan_1_4_Features;
-    requested_features_13 := VK.Physical_Device_Vulkan_1_3_Features.{
-        p_next            = *requested_features_14,
+    desired_features_14: VK.Physical_Device_Vulkan_1_4_Features;
+    desired_features_13 := VK.Physical_Device_Vulkan_1_3_Features.{
+        p_next            = *desired_features_14,
         synchronization_2 = VK.TRUE,
         dynamic_rendering = VK.TRUE,
     };
-    requested_features_12 := VK.Physical_Device_Vulkan_1_2_Features.{
-        p_next             = *requested_features_13,
+    desired_features_12 := VK.Physical_Device_Vulkan_1_2_Features.{
+        p_next             = *desired_features_13,
         timeline_semaphore = VK.TRUE,
     };
-    requested_features := VK.Physical_Device_Features_2.{ p_next = *requested_features_12 };
+    desired_features := VK.Physical_Device_Features_2.{ p_next = *desired_features_12 };
 
     queue_priorities := float.[1];
     device_queue_create_infos := VK.Device_Queue_Create_Info.[
@@ -134,7 +272,7 @@ create_device :: (physical_device: VK.Physical_Device, gfx_qfi: u32) -> VK.Devic
     array_add(*extensions, VK.Extension_Names.KHR_SWAPCHAIN);
 
     device_create_info := VK.Device_Create_Info.{
-        p_next                     = *requested_features,
+        p_next                     = *desired_features,
         queue_create_info_count    = device_queue_create_infos.count,
         p_queue_create_infos       = device_queue_create_infos.data,
         enabled_extension_count    = xx extensions.count,
