@@ -28,6 +28,9 @@ Renderer :: struct {
     depth_info:     Depth_Info;
 
     graphics_pipeline_info: Graphics_Pipeline_Info;
+
+    timeline_semaphore: VK.Semaphore;
+    frame_resources_list: [MAX_FRAMES_IN_FLIGHT_COUNT]Frame_Resources;
 }
 
 Swapchain_Info :: struct {
@@ -48,6 +51,12 @@ Depth_Info :: struct {
 Graphics_Pipeline_Info :: struct {
     pipeline: VK.Pipeline;
     layout:   VK.Pipeline_Layout;
+}
+
+Frame_Resources :: struct {
+    command_pool:             VK.Command_Pool;
+    command_buffer:           VK.Command_Buffer;
+    image_acquired_semaphore: VK.Semaphore;
 }
 
 init :: (
@@ -89,10 +98,21 @@ init :: (
 
     renderer.graphics_pipeline_info = create_graphics_pipeline(renderer.device);
 
+    renderer.timeline_semaphore = create_timeline_semaphore(renderer.device);
+    renderer.frame_resources_list = create_frame_resources(renderer.device, renderer.graphics_qfi);
+
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
+    VK.device_wait_idle(renderer.device);
+
+    for *frame_resources: renderer.frame_resources_list {
+        destroy_frame_resources(renderer.device, frame_resources);
+    }
+
+    VK.destroy_semaphore(renderer.device, renderer.timeline_semaphore);
+
     destroy_graphics_pipeline(renderer.device, *renderer.graphics_pipeline_info);
 
     destroy_depth(renderer.device, renderer.allocator, *renderer.depth_info);
@@ -121,8 +141,66 @@ VULKAN_API_VERSION :: #run VK.make_version(1, 4, 350);
 SURFACE_FORMAT :: VK.Format.B8G8R8A8_SRGB;
 DEPTH_FORMAT   :: VK.Format.D32_SFLOAT;
 
+// Is not tied to the number of swapchain images.
+// Though, the number of swapchain images should not be less than the number of frames in flight
+MAX_FRAMES_IN_FLIGHT_COUNT :: 2;
+
 ASSERT_SUCCESS :: (name: string) #expand {
     assert(`result == .SUCCESS, name);
+}
+
+destroy_frame_resources :: (
+    device: VK.Device,
+    frame_resources: *Frame_Resources,
+) {
+    VK.destroy_semaphore(device, frame_resources.image_acquired_semaphore);
+    VK.destroy_command_pool(device, frame_resources.command_pool);
+
+    frame_resources.* = {};
+}
+
+create_frame_resources :: (
+    device: VK.Device,
+    qfi:    u32,
+) -> frame_resources_list: [MAX_FRAMES_IN_FLIGHT_COUNT]Frame_Resources {
+    frame_resources_list: [MAX_FRAMES_IN_FLIGHT_COUNT]Frame_Resources;
+    for *frame_resources: frame_resources_list {
+        semaphore_create_info: VK.Semaphore_Create_Info;
+        result:, frame_resources.image_acquired_semaphore = VK.create_semaphore(device, *semaphore_create_info);
+        ASSERT_SUCCESS("Image acquired semaphore");
+
+        command_pool_create_info := VK.Command_Pool_Create_Info.{
+            queue_family_index = qfi,
+        };
+        result, frame_resources.command_pool = VK.create_command_pool(device, *command_pool_create_info);
+        ASSERT_SUCCESS("Command pool");
+
+        command_buffer_allocate_info := VK.Command_Buffer_Allocate_Info.{
+            command_pool         = frame_resources.command_pool,
+            level                = .PRIMARY,
+            command_buffer_count = 1,
+        };
+        result, frame_resources.command_buffer = VK.allocate_command_buffer(device, *command_buffer_allocate_info);
+        ASSERT_SUCCESS("Command buffer");
+    }
+
+    return frame_resources_list;
+}
+
+create_timeline_semaphore :: (device: VK.Device) -> VK.Semaphore {
+    semaphore_type_create_info := VK.Semaphore_Type_Create_Info.{
+        semaphore_type = .TIMELINE,
+        initial_value  = MAX_FRAMES_IN_FLIGHT_COUNT,
+    };
+
+    semaphore_create_info := VK.Semaphore_Create_Info.{
+        p_next = *semaphore_type_create_info,
+    };
+
+    result, timeline_semaphore := VK.create_semaphore(device, *semaphore_create_info);
+    ASSERT_SUCCESS("Timeline semaphore");
+
+    return timeline_semaphore;
 }
 
 destroy_graphics_pipeline :: (device: VK.Device, graphics_pipeline_info: *Graphics_Pipeline_Info) {
