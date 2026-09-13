@@ -15,6 +15,9 @@ Renderer :: struct {
     instance:        VK.Instance;
     surface:         VK.Surface_Khr;
     physical_device: VK.Physical_Device;
+
+    // Graphics queue family index
+    gfx_qfi: u32;
 }
 
 init :: (
@@ -33,6 +36,8 @@ init :: (
     assert(ok, "Failed to create surface");
 
     renderer.physical_device = find_physical_device(renderer.instance);
+
+    renderer.gfx_qfi = find_graphics_queue_family_index(renderer.physical_device, renderer.surface);
 
     return renderer;
 }
@@ -55,6 +60,26 @@ VULKAN_API_VERSION :: #run VK.make_version(1, 4, 350);
 
 ASSERT_SUCCESS :: (name: string) #expand {
     assert(`result == .SUCCESS, name);
+}
+
+find_graphics_queue_family_index :: (physical_device: VK.Physical_Device, surface: VK.Surface_Khr) -> u32 {
+    graphics_qf_index := -1;
+
+    qfps_list := VK.get_physical_device_queue_family_properties_2(physical_device,, temp);
+
+    for qfps: qfps_list {
+        result, has_present_support := VK.get_physical_device_surface_support_khr(physical_device, xx it_index, surface);
+        ASSERT_SUCCESS("Surface support");
+
+        if has_present_support && qfps.queue_family_properties.queue_flags & .GRAPHICS {
+            graphics_qf_index = it_index;
+            break;
+        }
+    }
+
+    assert(graphics_qf_index >= 0, "Graphics queue family was not found");
+
+    return xx graphics_qf_index;
 }
 
 find_physical_device :: (instance: VK.Instance) -> VK.Physical_Device {
