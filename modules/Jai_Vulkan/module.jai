@@ -19,6 +19,7 @@ Command_Pool          :: #type *Command_Pool_T;
 Command_Buffer        :: #type *Command_Buffer_T;
 Fence                 :: #type *Fence_T;
 Framebuffer           :: #type *Framebuffer_T;
+Buffer                :: #type *Buffer_T;
 
 Bool :: #type,isa u32;
 TRUE:  Bool : 1;
@@ -854,6 +855,149 @@ Command_Buffer_Inheritance_Info :: struct {
     pipeline_statistics:    Query_Pipeline_Statistic_Flags;
 }
 
+Image_Memory_Barrier_2 :: struct {
+    s_type                  := Structure_Type.IMAGE_MEMORY_BARRIER_2;
+    p_next:                 *void;
+    src_stage_mask:         Pipeline_Stage_Flags_2;
+    src_access_mask:        Access_Flags_2;
+    dst_stage_mask:         Pipeline_Stage_Flags_2;
+    dst_access_mask:        Access_Flags_2;
+    old_layout:             Image_Layout;
+    new_layout:             Image_Layout;
+    src_queue_family_index: u32;
+    dst_queue_family_index: u32;
+    image:                  Image;
+    subresource_range:      Image_Subresource_Range;
+}
+
+Dependency_Info :: struct {
+    s_type                       := Structure_Type.DEPENDENCY_INFO;
+    p_next:                      *void;
+    dependency_flags:            Dependency_Flags;
+    memory_barrier_count:        u32;
+    p_memory_barriers:           *Memory_Barrier_2;
+    buffer_memory_barrier_count: u32;
+    p_buffer_memory_barriers:    *Buffer_Memory_Barrier_2;
+    image_memory_barrier_count:  u32;
+    p_image_memory_barriers:     *Image_Memory_Barrier_2;
+}
+
+Memory_Barrier_2 :: struct {
+    s_type           := Structure_Type.MEMORY_BARRIER_2;
+    p_next:          *void;
+    src_stage_mask:  Pipeline_Stage_Flags_2;
+    src_access_mask: Access_Flags_2;
+    dst_stage_mask:  Pipeline_Stage_Flags_2;
+    dst_access_mask: Access_Flags_2;
+}
+
+Buffer_Memory_Barrier_2 :: struct {
+    s_type :=               Structure_Type.BUFFER_MEMORY_BARRIER_2;
+    p_next:                 *void;
+    src_stage_mask:         Pipeline_Stage_Flags_2;
+    src_access_mask:        Access_Flags_2;
+    dst_stage_mask:         Pipeline_Stage_Flags_2;
+    dst_access_mask:        Access_Flags_2;
+    src_queue_family_index: u32;
+    dst_queue_family_index: u32;
+    buffer:                 Buffer;
+    offset:                 Device_Size;
+    size:                   Device_Size;
+}
+
+Rendering_Attachment_Info :: struct {
+    s_type                := Structure_Type.RENDERING_ATTACHMENT_INFO;
+    p_next:               *void;
+    image_view:           Image_View;
+    image_layout:         Image_Layout;
+    resolve_mode:         Resolve_Mode_Flags;
+    resolve_image_view:   Image_View;
+    resolve_image_layout: Image_Layout;
+    load_op:              Attachment_Load_Op;
+    store_op:             Attachment_Store_Op;
+    clear_value:          Clear_Value;
+}
+
+Clear_Value :: union {
+    color:         Clear_Color_Value;
+    depth_stencil: Clear_Depth_Stencil_Value;
+}
+
+Clear_Color_Value :: union {
+    _float32: [4] float;
+    int32:    [4] s32;
+    uint32:   [4] u32;
+}
+
+Clear_Depth_Stencil_Value :: struct {
+    depth:   float;
+    stencil: u32;
+}
+
+Rendering_Info :: struct {
+    s_type                  := Structure_Type.RENDERING_INFO;
+    p_next:                 *void;
+    flags:                  Rendering_Flags;
+    render_area:            Rect_2D;
+    layer_count:            u32;
+    view_mask:              u32;
+    color_attachment_count: u32;
+    p_color_attachments:    *Rendering_Attachment_Info;
+    p_depth_attachment:     *Rendering_Attachment_Info;
+    p_stencil_attachment:   *Rendering_Attachment_Info;
+}
+
+Semaphore_Submit_Info :: struct {
+    s_type        := Structure_Type.SEMAPHORE_SUBMIT_INFO;
+    p_next:       *void;
+    semaphore:    Semaphore;
+    value:        u64;
+    stage_mask:   Pipeline_Stage_Flags_2;
+    device_index: u32;
+}
+
+Command_Buffer_Submit_Info :: struct  {
+    s_type          := Structure_Type.COMMAND_BUFFER_SUBMIT_INFO;
+    p_next:         *void;
+    command_buffer: Command_Buffer;
+    device_mask:    u32;
+}
+
+Submit_Info_2 :: struct {
+    s_type                       := Structure_Type.SUBMIT_INFO_2;
+    p_next:                      *void;
+    flags:                       Submit_Flags;
+    wait_semaphore_info_count:   u32;
+    p_wait_semaphore_infos:      *Semaphore_Submit_Info;
+    command_buffer_info_count:   u32;
+    p_command_buffer_infos:      *Command_Buffer_Submit_Info;
+    signal_semaphore_info_count: u32;
+    p_signal_semaphore_infos:    *Semaphore_Submit_Info;
+}
+
+Present_Info_Khr :: struct {
+    s_type                := Structure_Type.PRESENT_INFO_KHR;
+    p_next:               *void;
+    wait_semaphore_count: u32;
+    p_wait_semaphores:    *Semaphore;
+    swapchain_count:      u32;
+    p_swapchains:         *Swapchain_Khr;
+    p_image_indices:      *u32;
+    p_results:            *Result;
+}
+
+Dependency_Flags :: enum_flags u32 {
+    BY_REGION                                          :: 1;
+    DEVICE_GROUP                                       :: 4;
+    VIEW_LOCAL                                         :: 2;
+    FEEDBACK_LOOP_EXT                                  :: 8;
+    QUEUE_FAMILY_OWNERSHIP_TRANSFER_USE_ALL_STAGES_KHR :: 32;
+    ASYMMETRIC_EVENT_KHR                               :: 64;
+    VIEW_LOCAL_KHR                                     :: 2;
+    DEVICE_GROUP_KHR                                   :: 4;
+    FLAG_BITS_MAX_ENUM                                 :: 2147483647;
+}
+
 Stencil_Op :: enum u32 {
     KEEP                :: 0;
     ZERO                :: 1;
@@ -1212,7 +1356,171 @@ Query_Control_Flags :: enum_flags u32 {
     FLAG_BITS_MAX_ENUM :: 2147483647;
 }
 
-Image_Create_Flags :: enum u32 {
+Pipeline_Stage_Flags_2 :: enum_flags u64 {
+    NONE                                 :: 0;
+    TOP_OF_PIPE                          :: 1;
+    DRAW_INDIRECT                        :: 2;
+    VERTEX_INPUT                         :: 4;
+    VERTEX_SHADER                        :: 8;
+    TESSELLATION_CONTROL_SHADER          :: 16;
+    TESSELLATION_EVALUATION_SHADER       :: 32;
+    GEOMETRY_SHADER                      :: 64;
+    FRAGMENT_SHADER                      :: 128;
+    EARLY_FRAGMENT_TESTS                 :: 256;
+    LATE_FRAGMENT_TESTS                  :: 512;
+    COLOR_ATTACHMENT_OUTPUT              :: 1024;
+    COMPUTE_SHADER                       :: 2048;
+    ALL_TRANSFER                         :: 4096;
+    TRANSFER                             :: 4096;
+    BOTTOM_OF_PIPE                       :: 8192;
+    HOST                                 :: 16384;
+    ALL_GRAPHICS                         :: 32768;
+    ALL_COMMANDS                         :: 65536;
+    COPY                                 :: 4294967296;
+    RESOLVE                              :: 8589934592;
+    BLIT                                 :: 17179869184;
+    CLEAR                                :: 34359738368;
+    INDEX_INPUT                          :: 68719476736;
+    VERTEX_ATTRIBUTE_INPUT               :: 137438953472;
+    PRE_RASTERIZATION_SHADERS            :: 274877906944;
+    VIDEO_DECODE_KHR                     :: 67108864;
+    VIDEO_ENCODE_KHR                     :: 134217728;
+    NONE_KHR                             :: 0;
+    TOP_OF_PIPE_KHR                      :: 1;
+    DRAW_INDIRECT_KHR                    :: 2;
+    VERTEX_INPUT_KHR                     :: 4;
+    VERTEX_SHADER_KHR                    :: 8;
+    TESSELLATION_CONTROL_SHADER_KHR      :: 16;
+    TESSELLATION_EVALUATION_SHADER_KHR   :: 32;
+    GEOMETRY_SHADER_KHR                  :: 64;
+    FRAGMENT_SHADER_KHR                  :: 128;
+    EARLY_FRAGMENT_TESTS_KHR             :: 256;
+    LATE_FRAGMENT_TESTS_KHR              :: 512;
+    COLOR_ATTACHMENT_OUTPUT_KHR          :: 1024;
+    COMPUTE_SHADER_KHR                   :: 2048;
+    ALL_TRANSFER_KHR                     :: 4096;
+    TRANSFER_KHR                         :: 4096;
+    BOTTOM_OF_PIPE_KHR                   :: 8192;
+    HOST_KHR                             :: 16384;
+    ALL_GRAPHICS_KHR                     :: 32768;
+    ALL_COMMANDS_KHR                     :: 65536;
+    COPY_KHR                             :: 4294967296;
+    RESOLVE_KHR                          :: 8589934592;
+    BLIT_KHR                             :: 17179869184;
+    CLEAR_KHR                            :: 34359738368;
+    INDEX_INPUT_KHR                      :: 68719476736;
+    VERTEX_ATTRIBUTE_INPUT_KHR           :: 137438953472;
+    PRE_RASTERIZATION_SHADERS_KHR        :: 274877906944;
+    TRANSFORM_FEEDBACK_EXT               :: 16777216;
+    CONDITIONAL_RENDERING_EXT            :: 262144;
+    COMMAND_PREPROCESS_NV                :: 131072;
+    COMMAND_PREPROCESS_EXT               :: 131072;
+    FRAGMENT_SHADING_RATE_ATTACHMENT_KHR :: 4194304;
+    SHADING_RATE_IMAGE_NV                :: 4194304;
+    ACCELERATION_STRUCTURE_BUILD_KHR     :: 33554432;
+    RAY_TRACING_SHADER_KHR               :: 2097152;
+    RAY_TRACING_SHADER_NV                :: 2097152;
+    ACCELERATION_STRUCTURE_BUILD_NV      :: 33554432;
+    FRAGMENT_DENSITY_PROCESS_EXT         :: 8388608;
+    TASK_SHADER_NV                       :: 524288;
+    MESH_SHADER_NV                       :: 1048576;
+    TASK_SHADER_EXT                      :: 524288;
+    MESH_SHADER_EXT                      :: 1048576;
+    SUBPASS_SHADER_HUAWEI                :: 549755813888;
+
+    SUBPASS_SHADING_HUAWEI               :: 549755813888;
+    INVOCATION_MASK_HUAWEI               :: 1099511627776;
+    ACCELERATION_STRUCTURE_COPY_KHR      :: 268435456;
+    MICROMAP_BUILD_EXT                   :: 1073741824;
+    CLUSTER_CULLING_SHADER_HUAWEI        :: 2199023255552;
+    OPTICAL_FLOW_NV                      :: 536870912;
+    CONVERT_COOPERATIVE_VECTOR_MATRIX_NV :: 17592186044416;
+    DATA_GRAPH_ARM                       :: 4398046511104;
+    COPY_INDIRECT_KHR                    :: 70368744177664;
+    MEMORY_DECOMPRESSION_EXT             :: 35184372088832;
+}
+
+Access_Flags_2 :: enum_flags u64 {
+    NONE                                      :: 0;
+    INDIRECT_COMMAND_READ                     :: 1;
+    INDEX_READ                                :: 2;
+    VERTEX_ATTRIBUTE_READ                     :: 4;
+    UNIFORM_READ                              :: 8;
+    INPUT_ATTACHMENT_READ                     :: 16;
+    SHADER_READ                               :: 32;
+    SHADER_WRITE                              :: 64;
+    COLOR_ATTACHMENT_READ                     :: 128;
+    COLOR_ATTACHMENT_WRITE                    :: 256;
+    DEPTH_STENCIL_ATTACHMENT_READ             :: 512;
+    DEPTH_STENCIL_ATTACHMENT_WRITE            :: 1024;
+    TRANSFER_READ                             :: 2048;
+    TRANSFER_WRITE                            :: 4096;
+    HOST_READ                                 :: 8192;
+    HOST_WRITE                                :: 16384;
+    MEMORY_READ                               :: 32768;
+    MEMORY_WRITE                              :: 65536;
+    SHADER_SAMPLED_READ                       :: 4294967296;
+    SHADER_STORAGE_READ                       :: 8589934592;
+    SHADER_STORAGE_WRITE                      :: 17179869184;
+    VIDEO_DECODE_READ_KHR                     :: 34359738368;
+    VIDEO_DECODE_WRITE_KHR                    :: 68719476736;
+    SAMPLER_HEAP_READ_EXT                     :: 144115188075855872;
+    RESOURCE_HEAP_READ_EXT                    :: 288230376151711744;
+    VIDEO_ENCODE_READ_KHR                     :: 137438953472;
+    VIDEO_ENCODE_WRITE_KHR                    :: 274877906944;
+    SHADER_TILE_ATTACHMENT_READ_QCOM          :: 2251799813685248;
+    SHADER_TILE_ATTACHMENT_WRITE_QCOM         :: 4503599627370496;
+    NONE_KHR                                  :: 0;
+    INDIRECT_COMMAND_READ_KHR                 :: 1;
+    INDEX_READ_KHR                            :: 2;
+    VERTEX_ATTRIBUTE_READ_KHR                 :: 4;
+    UNIFORM_READ_KHR                          :: 8;
+    INPUT_ATTACHMENT_READ_KHR                 :: 16;
+    SHADER_READ_KHR                           :: 32;
+    SHADER_WRITE_KHR                          :: 64;
+    COLOR_ATTACHMENT_READ_KHR                 :: 128;
+    COLOR_ATTACHMENT_WRITE_KHR                :: 256;
+    DEPTH_STENCIL_ATTACHMENT_READ_KHR         :: 512;
+    DEPTH_STENCIL_ATTACHMENT_WRITE_KHR        :: 1024;
+    TRANSFER_READ_KHR                         :: 2048;
+    TRANSFER_WRITE_KHR                        :: 4096;
+    HOST_READ_KHR                             :: 8192;
+    HOST_WRITE_KHR                            :: 16384;
+    MEMORY_READ_KHR                           :: 32768;
+    MEMORY_WRITE_KHR                          :: 65536;
+    SHADER_SAMPLED_READ_KHR                   :: 4294967296;
+    SHADER_STORAGE_READ_KHR                   :: 8589934592;
+    SHADER_STORAGE_WRITE_KHR                  :: 17179869184;
+    TRANSFORM_FEEDBACK_WRITE_EXT              :: 33554432;
+    TRANSFORM_FEEDBACK_COUNTER_READ_EXT       :: 67108864;
+    TRANSFORM_FEEDBACK_COUNTER_WRITE_EXT      :: 134217728;
+    CONDITIONAL_RENDERING_READ_EXT            :: 1048576;
+    COMMAND_PREPROCESS_READ_NV                :: 131072;
+    COMMAND_PREPROCESS_WRITE_NV               :: 262144;
+    COMMAND_PREPROCESS_READ_EXT               :: 131072;
+    COMMAND_PREPROCESS_WRITE_EXT              :: 262144;
+    FRAGMENT_SHADING_RATE_ATTACHMENT_READ_KHR :: 8388608;
+    SHADING_RATE_IMAGE_READ_NV                :: 8388608;
+    ACCELERATION_STRUCTURE_READ_KHR           :: 2097152;
+    ACCELERATION_STRUCTURE_WRITE_KHR          :: 4194304;
+    ACCELERATION_STRUCTURE_READ_NV            :: 2097152;
+    ACCELERATION_STRUCTURE_WRITE_NV           :: 4194304;
+    FRAGMENT_DENSITY_MAP_READ_EXT             :: 16777216;
+    COLOR_ATTACHMENT_READ_NONCOHERENT_EXT     :: 524288;
+    DESCRIPTOR_BUFFER_READ_EXT                :: 2199023255552;
+    INVOCATION_MASK_READ_HUAWEI               :: 549755813888;
+    SHADER_BINDING_TABLE_READ_KHR             :: 1099511627776;
+    MICROMAP_READ_EXT                         :: 17592186044416;
+    MICROMAP_WRITE_EXT                        :: 35184372088832;
+    OPTICAL_FLOW_READ_NV                      :: 4398046511104;
+    OPTICAL_FLOW_WRITE_NV                     :: 8796093022208;
+    DATA_GRAPH_READ_ARM                       :: 140737488355328;
+    DATA_GRAPH_WRITE_ARM                      :: 281474976710656;
+    MEMORY_DECOMPRESSION_READ_EXT             :: 36028797018963968;
+    MEMORY_DECOMPRESSION_WRITE_EXT            :: 72057594037927936;
+}
+
+Image_Create_Flags :: enum_flags u32 {
     SPARSE_BINDING                            :: 1;
     SPARSE_RESIDENCY                          :: 2;
     SPARSE_ALIASED                            :: 4;
@@ -1244,6 +1552,82 @@ Image_Create_Flags :: enum u32 {
     FRAGMENT_DENSITY_MAP_OFFSET_QCOM          :: 32768;
     FLAG_BITS_MAX_ENUM                        :: 2147483647;
 }
+
+Resolve_Mode_Flags :: enum_flags u32 {
+    NONE                               :: 0;
+    SAMPLE_ZERO                        :: 0x00000001;
+    AVERAGE                            :: 0x00000002;
+    MIN                                :: 0x00000004;
+    MAX                                :: 0x00000008;
+    EXTERNAL_FORMAT_DOWNSAMPLEANDROID  :: 0x00000010;
+    CUSTOMEXT                          :: 0x00000020;
+    NONE_KHR                           :: NONE;
+    SAMPLE_ZEROKHR                     :: SAMPLE_ZERO;
+    AVERAGEKHR                         :: AVERAGE;
+    MINKHR                             :: MIN;
+    MAXKHR                             :: MAX;
+    EXTERNAL_FORMAT_DOWNSAMPLE_ANDROID :: EXTERNAL_FORMAT_DOWNSAMPLEANDROID;
+};
+
+Rendering_Flags :: enum_flags u32 {
+    CONTENTS_SECONDARY_COMMAND_BUFFERS       :: 1;
+    SUSPENDING                               :: 2;
+    RESUMING                                 :: 4;
+    ENABLE_LEGACY_DITHERING_EXT              :: 8;
+    CONTENTS_INLINE_KHR                      :: 16;
+    PER_LAYER_FRAGMENT_DENSITY_VALVE         :: 32;
+    FRAGMENT_REGION_EXT                      :: 64;
+    CUSTOM_RESOLVE_EXT                       :: 128;
+    LOCAL_READ_CONCURRENT_ACCESS_CONTROL_KHR :: 256;
+    CONTENTS_SECONDARY_COMMAND_BUFFERS_KHR   :: 1;
+    SUSPENDING_KHR                           :: 2;
+    RESUMING_KHR                             :: 4;
+    CONTENTS_INLINE_EXT                      :: 16;
+    FLAG_BITS_MAX_ENUM                       :: 2147483647;
+}
+
+Pipeline_Stage_Flags :: enum_flags u32 {
+    TOP_OF_PIPE                          :: 1;
+    DRAW_INDIRECT                        :: 2;
+    VERTEX_INPUT                         :: 4;
+    VERTEX_SHADER                        :: 8;
+    TESSELLATION_CONTROL_SHADER          :: 16;
+    TESSELLATION_EVALUATION_SHADER       :: 32;
+    GEOMETRY_SHADER                      :: 64;
+    FRAGMENT_SHADER                      :: 128;
+    EARLY_FRAGMENT_TESTS                 :: 256;
+    LATE_FRAGMENT_TESTS                  :: 512;
+    COLOR_ATTACHMENT_OUTPUT              :: 1024;
+    COMPUTE_SHADER                       :: 2048;
+    TRANSFER                             :: 4096;
+    BOTTOM_OF_PIPE                       :: 8192;
+    HOST                                 :: 16384;
+    ALL_GRAPHICS                         :: 32768;
+    ALL_COMMANDS                         :: 65536;
+    NONE                                 :: 0;
+    TRANSFORM_FEEDBACK_EXT               :: 16777216;
+    CONDITIONAL_RENDERING_EXT            :: 262144;
+    ACCELERATION_STRUCTURE_BUILD_KHR     :: 33554432;
+    RAY_TRACING_SHADER_KHR               :: 2097152;
+    FRAGMENT_DENSITY_PROCESS_EXT         :: 8388608;
+    FRAGMENT_SHADING_RATE_ATTACHMENT_KHR :: 4194304;
+    TASK_SHADER_EXT                      :: 524288;
+    MESH_SHADER_EXT                      :: 1048576;
+    COMMAND_PREPROCESS_EXT               :: 131072;
+    SHADING_RATE_IMAGE_NV                :: 4194304;
+    RAY_TRACING_SHADER_NV                :: 2097152;
+    ACCELERATION_STRUCTURE_BUILD_NV      :: 33554432;
+    TASK_SHADER_NV                       :: 524288;
+    MESH_SHADER_NV                       :: 1048576;
+    COMMAND_PREPROCESS_NV                :: 131072;
+    NONE_KHR                             :: 0;
+    FLAG_BITS_MAX_ENUM                   :: 2147483647;
+}
+
+Submit_Flags :: enum_flags u32 {
+    PROTECTED     :: 0x00000001;
+    PROTECTED_KHR :: PROTECTED;
+};
 
 Structure_Type :: enum u32 {
     APPLICATION_INFO                                                       :: 0;
@@ -3597,6 +3981,37 @@ Command_Buffer_Level :: enum u32 {
     MAX_ENUM  :: 2147483647;
 }
 
+Attachment_Store_Op :: enum u32 {
+    STORE     :: 0;
+    DONT_CARE :: 1;
+    NONE      :: 1000301000;
+    NONE_KHR  :: 1000301000;
+    NONE_QCOM :: 1000301000;
+    NONE_EXT  :: 1000301000;
+    MAX_ENUM  :: 2147483647;
+}
+
+Attachment_Load_Op :: enum u32 {
+    LOAD      :: 0;
+    CLEAR     :: 1;
+    DONT_CARE :: 2;
+    NONE      :: 1000400000;
+    NONE_EXT  :: 1000400000;
+    NONE_KHR  :: 1000400000;
+    MAX_ENUM  :: 2147483647;
+}
+
+Pipeline_Bind_Point :: enum u32 {
+    GRAPHICS               :: 0;
+    COMPUTE                :: 1;
+
+    RAY_TRACING_KHR        :: 1000165000;
+    SUBPASS_SHADING_HUAWEI :: 1000369003;
+    DATA_GRAPH_ARM         :: 1000507000;
+    RAY_TRACING_NV         :: 1000165000;
+    MAX_ENUM               :: 2147483647;
+}
+
 make_version :: (major: u32, minor: u32, patch: u32) -> u32 {
     return (major << 22) | (minor << 12) | patch;
 }
@@ -4025,6 +4440,73 @@ begin_command_buffer :: (
     p_begin_info:   *Command_Buffer_Begin_Info,
 ) -> Result #foreign libvulkan "vkBeginCommandBuffer";
 
+cmd_pipeline_barrier_2 :: (
+    command_buffer: Command_Buffer,
+    p_dependency_info: *Dependency_Info,
+) -> void #foreign libvulkan "vkCmdPipelineBarrier2";
+
+cmd_begin_rendering :: (
+    command_buffer: Command_Buffer,
+    p_rendering_info: *Rendering_Info,
+) -> void #foreign libvulkan "vkCmdBeginRendering";
+
+cmd_set_viewport :: inline (
+    command_buffer: Command_Buffer,
+    viewports:      []Viewport,
+) {
+    vkCmdSetViewport(
+        command_buffer,
+        0,
+        cast(u32, viewports.count),
+        viewports.data,
+    );
+}
+
+cmd_set_scissor :: inline (command_buffer: Command_Buffer, scissors: []Rect_2D) {
+    vkCmdSetScissor(
+        command_buffer,
+        0,
+        cast(u32, scissors.count),
+        scissors.data,
+    );
+}
+
+cmd_bind_pipeline :: (
+    command_buffer:      Command_Buffer,
+    pipeline_bind_point: Pipeline_Bind_Point,
+    pipeline:            Pipeline,
+) -> void #foreign libvulkan "vkCmdBindPipeline";
+
+cmd_draw :: (
+    command_buffer: Command_Buffer,
+    vertex_count:   u32,
+    instance_count: u32,
+    first_vertex:   u32,
+    first_instance: u32,
+) -> void #foreign libvulkan "vkCmdDraw";
+
+cmd_end_rendering :: (command_buffer: Command_Buffer) -> void #foreign libvulkan "vkCmdEndRendering";
+
+end_command_buffer :: (command_buffer: Command_Buffer) -> Result #foreign libvulkan "vkEndCommandBuffer";
+
+queue_submit_2 :: inline (
+    queue:     Queue,
+    p_submits: []Submit_Info_2,
+    fence:     Fence
+) -> Result {
+    return vkQueueSubmit2(
+        queue,
+        cast(u32, p_submits.count),
+        p_submits.data,
+        fence,
+    );
+}
+
+queue_present_khr :: (
+    queue: Queue,
+    p_present_info: *Present_Info_Khr,
+) -> Result #foreign libvulkan "vkQueuePresentKHR";
+
 
 
 #scope_file
@@ -4049,7 +4531,8 @@ Pipeline_Cache_T        :: struct {}
 Command_Pool_T          :: struct {}
 Command_Buffer_T        :: struct {}
 Fence_T                 :: struct {}
-Framebuffer_T           :: struct {};
+Framebuffer_T           :: struct {}
+Buffer_T                :: struct {}
 
 vkCreateInstance :: (
     p_create_info: *Instance_Create_Info,
@@ -4180,6 +4663,27 @@ vkAcquireNextImageKHR :: (
     semaphore:     Semaphore,
     fence:         Fence,
     p_image_index: *u32,
+) -> Result #foreign libvulkan;
+
+vkCmdSetViewport :: (
+    commandBuffer: Command_Buffer,
+    firstViewport: u32,
+    viewportCount: u32,
+    pViewports:    *Viewport,
+) -> void #foreign libvulkan;
+
+vkCmdSetScissor :: (
+    commandBuffer: Command_Buffer,
+    firstScissor:  u32,
+    scissorCount:  u32,
+    pScissors:     *Rect_2D,
+) -> void #foreign libvulkan;
+
+vkQueueSubmit2 :: (
+    queue:        Queue,
+    submit_count: u32,
+    p_submits:    *Submit_Info_2,
+    fence:        Fence,
 ) -> Result #foreign libvulkan;
 
 #if OS == {
