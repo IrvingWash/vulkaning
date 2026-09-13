@@ -1005,17 +1005,17 @@ get_window_size_in_pixels :: (window: *Window) -> width: s32, height: s32 {
 
 vulkan_get_instance_extensions :: (count: *u32) -> **u8 #foreign libsdl3 "SDL_Vulkan_GetInstanceExtensions";
 
-vulkan_create_surface :: (window: *Window, instance: *void, allocator: *void = null) -> *void {
-    surface: *void;
+vulkan_create_surface :: (window: *Window, instance: VK.Instance, allocator: *void = null) -> ok: bool, VK.Surface_Khr {
+    surface: VK.Surface_Khr;
 
     ok := SDL_Vulkan_CreateSurface(window, instance, allocator, *surface);
 
-    return surface;
+    return ok, surface;
 }
 
 #scope_file
 
-SDL_Vulkan_CreateSurface :: (window: *void, instance: *void, allocator: *void, surface: *void) -> bool #foreign libsdl3;
+SDL_Vulkan_CreateSurface :: (window: *Window, instance: VK.Instance, allocator: *void, surface: *VK.Surface_Khr) -> bool #foreign libsdl3;
 SDL_GetWindowSizeInPixels :: (window: *Window, w: *s32, h: *s32) -> bool #foreign libsdl3;
 
 #if OS == {
@@ -1024,3 +1024,5 @@ SDL_GetWindowSizeInPixels :: (window: *Window, w: *s32, h: *s32) -> bool #foreig
     case;
         #assert "Unsupported OS";
 }
+
+VK :: #import "Jai_Vulkan";
