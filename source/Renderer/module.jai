@@ -21,6 +21,8 @@ Renderer :: struct {
 
     device:    VK.Device;
     gfx_queue: VK.Queue;
+
+    allocator: VMA.Allocator;
 }
 
 init :: (
@@ -46,13 +48,17 @@ init :: (
 
     renderer.gfx_queue = VK.get_device_queue(renderer.device, renderer.gfx_qfi, 0);
 
+    renderer.allocator = init_vma(renderer.physical_device, renderer.device, renderer.instance);
+
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
-    VK.destroy_device(renderer.device);
+    VMA.destroy_allocator(renderer.allocator);
 
     VK.destroy_surface_khr(renderer.instance, renderer.surface);
+
+    VK.destroy_device(renderer.device);
 
     VK.destroy_instance(renderer.instance);
 
@@ -69,6 +75,21 @@ VULKAN_API_VERSION :: #run VK.make_version(1, 4, 350);
 
 ASSERT_SUCCESS :: (name: string) #expand {
     assert(`result == .SUCCESS, name);
+}
+
+init_vma :: (physical_device: VK.Physical_Device, device: VK.Device, instance: VK.Instance) -> VMA.Allocator {
+    allocator_create_info := VMA.Allocator_Create_Info.{
+        flags              = .BUFFER_DEVICE_ADDRESS,
+        physical_device    = physical_device,
+        device             = device,
+        instance           = instance,
+        vulkan_api_version = VULKAN_API_VERSION,
+    };
+
+    result, allocator := VMA.create_allocator(*allocator_create_info);
+    ASSERT_SUCCESS("VMA allocator");
+
+    return allocator;
 }
 
 create_device :: (physical_device: VK.Physical_Device, gfx_qfi: u32) -> VK.Device {
