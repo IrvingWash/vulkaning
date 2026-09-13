@@ -17,16 +17,17 @@ Renderer :: struct {
     surface:         VK.Surface_Khr;
     physical_device: VK.Physical_Device;
 
-    // Graphics queue family index
-    gfx_qfi: u32;
+    graphics_qfi: u32;
 
     device:    VK.Device;
-    gfx_queue: VK.Queue;
+    graphics_queue: VK.Queue;
 
     allocator: VMA.Allocator;
 
     swapchain_info: Swapchain_Info;
     depth_info:     Depth_Info;
+
+    graphics_pipeline_info: Graphics_Pipeline_Info;
 }
 
 Swapchain_Info :: struct {
@@ -42,6 +43,11 @@ Depth_Info :: struct {
     image:      VK.Image;
     allocation: VMA.Allocation;
     image_view: VK.Image_View;
+}
+
+Graphics_Pipeline_Info :: struct {
+    pipeline: VK.Pipeline;
+    layout:   VK.Pipeline_Layout;
 }
 
 init :: (
@@ -62,11 +68,11 @@ init :: (
 
     renderer.physical_device = find_physical_device(renderer.instance);
 
-    renderer.gfx_qfi = find_graphics_queue_family_index(renderer.physical_device, renderer.surface);
+    renderer.graphics_qfi = find_graphics_queue_family_index(renderer.physical_device, renderer.surface);
 
-    renderer.device = create_device(renderer.physical_device, renderer.gfx_qfi);
+    renderer.device = create_device(renderer.physical_device, renderer.graphics_qfi);
 
-    renderer.gfx_queue = VK.get_device_queue(renderer.device, renderer.gfx_qfi, 0);
+    renderer.graphics_queue = VK.get_device_queue(renderer.device, renderer.graphics_qfi, 0);
 
     renderer.allocator = init_vma(renderer.physical_device, renderer.device, renderer.instance);
 
@@ -81,10 +87,14 @@ init :: (
 
     renderer.depth_info = create_depth(renderer.device, renderer.swapchain_info.config.image_extent, renderer.allocator);
 
+    renderer.graphics_pipeline_info = create_graphics_pipeline(renderer.device);
+
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
+    destroy_graphics_pipeline(renderer.device, *renderer.graphics_pipeline_info);
+
     destroy_depth(renderer.device, renderer.allocator, *renderer.depth_info);
 
     destroy_swapchain(renderer.device, *renderer.swapchain_info);
@@ -113,6 +123,126 @@ DEPTH_FORMAT   :: VK.Format.D32_SFLOAT;
 
 ASSERT_SUCCESS :: (name: string) #expand {
     assert(`result == .SUCCESS, name);
+}
+
+destroy_graphics_pipeline :: (device: VK.Device, graphics_pipeline_info: *Graphics_Pipeline_Info) {
+    VK.destroy_pipeline_layout(device, graphics_pipeline_info.layout);
+
+    VK.destroy_pipeline(device, graphics_pipeline_info.pipeline);
+
+    graphics_pipeline_info.* = {};
+}
+
+create_graphics_pipeline :: (device: VK.Device) -> Graphics_Pipeline_Info {
+    graphics_pipeline_info: Graphics_Pipeline_Info;
+
+    { // Pipeline layout
+        layout_create_info := VK.Pipeline_Layout_Create_Info.{
+            set_layout_count          = 0,
+            push_constant_range_count = 0,
+        };
+
+        result:, graphics_pipeline_info.layout = VK.create_pipeline_layout(device, *layout_create_info);
+        ASSERT_SUCCESS("Pipeline layout");
+    }
+
+    vertex_shader := create_shader_module(device, "vertex.spv");
+    defer VK.destroy_shader_module(device, vertex_shader);
+    fragment_shader : = create_shader_module(device, "fragment.spv");
+    defer VK.destroy_shader_module(device, fragment_shader);
+
+    shader_stage_create_infos := VK.Pipeline_Shader_Stage_Create_Info.[
+        {
+            stage  = .VERTEX,
+            module = vertex_shader,
+            p_name = "main",
+        },
+        {
+            stage  = .FRAGMENT,
+            module = fragment_shader,
+            p_name = "main",
+        },
+    ];
+
+    vertex_input_state_create_info := VK.Pipeline_Vertex_Input_State_Create_Info.{};
+
+    input_assembly_state_create_info := VK.Pipeline_Input_Assembly_State_Create_Info.{
+        topology = .TRIANGLE_LIST,
+    };
+
+    depth_stencil_state_create_info := VK.Pipeline_Depth_Stencil_State_Create_Info.{
+        depth_test_enable   = VK.TRUE,
+        depth_write_enable  = VK.TRUE,
+        depth_compare_op    = .LESS,
+        stencil_test_enable = VK.FALSE,
+    };
+
+    viewport_state_create_info := VK.Pipeline_Viewport_State_Create_Info.{
+        viewport_count = 1,
+        p_viewports    = null,
+        scissor_count  = 1,
+        p_scissors     = null,
+    };
+
+    rasterization_state_create_info := VK.Pipeline_Rasterization_State_Create_Info.{
+        polygon_mode = .FILL,
+        cull_mode    = .BACK,
+        front_face   = .COUNTER_CLOCKWISE,
+        line_width   = 1,
+    };
+
+    multisample_state_create_info := VK.Pipeline_Multisample_State_Create_Info.{
+        rasterization_samples = ._1,
+    };
+
+    color_blend_attachment_states := VK.Pipeline_Color_Blend_Attachment_State.[
+        {
+            blend_enable = VK.FALSE,
+            color_write_mask = .R | .G | .B | .A,
+        },
+    ];
+
+    color_blend_state_create_info := VK.Pipeline_Color_Blend_State_Create_Info.{
+        attachment_count = color_blend_attachment_states.count,
+        p_attachments    = color_blend_attachment_states.data,
+    };
+
+    dynamic_states := VK.Dynamic_State.[
+        .VIEWPORT,
+        .SCISSOR,
+    ];
+
+    dynamic_state_create_info := VK.Pipeline_Dynamic_State_Create_Info.{
+        dynamic_state_count = dynamic_states.count,
+        p_dynamic_states    = dynamic_states.data,
+    };
+
+    rendering_create_info := VK.Pipeline_Rendering_Create_Info.{
+        color_attachment_count     = 1,
+        p_color_attachment_formats = VK.Format.[SURFACE_FORMAT].data,
+        depth_attachment_format    = DEPTH_FORMAT,
+    };
+
+    pipeline_create_info := VK.Graphics_Pipeline_Create_Info.{
+        p_next                 = *rendering_create_info,
+        stage_count            = shader_stage_create_infos.count,
+        p_stages               = shader_stage_create_infos.data,
+        p_vertex_input_state   = *vertex_input_state_create_info,
+        p_input_assembly_state = *input_assembly_state_create_info,
+        p_viewport_state       = *viewport_state_create_info,
+        p_rasterization_state  = *rasterization_state_create_info,
+        p_multisample_state    = *multisample_state_create_info,
+        p_depth_stencil_state  = *depth_stencil_state_create_info,
+        p_color_blend_state    = *color_blend_state_create_info,
+        p_dynamic_state        = *dynamic_state_create_info,
+        layout                 = graphics_pipeline_info.layout,
+        render_pass            = null,
+    };
+
+    result:, graphics_pipeline_info.pipeline = VK.create_graphics_pipeline(device, null, *pipeline_create_info);
+    ASSERT_SUCCESS("Graphics pipeline");
+
+    return graphics_pipeline_info;
 }
 
 create_shader_module :: (device: VK.Device, name: string) -> VK.Shader_Module {
@@ -319,7 +449,7 @@ init_vma :: (physical_device: VK.Physical_Device, device: VK.Device, instance: V
     return allocator;
 }
 
-create_device :: (physical_device: VK.Physical_Device, gfx_qfi: u32) -> VK.Device {
+create_device :: (physical_device: VK.Physical_Device, graphics_qfi: u32) -> VK.Device {
     {
         supported_features_14: VK.Physical_Device_Vulkan_1_4_Features;
         supported_features_13  := VK.Physical_Device_Vulkan_1_3_Features.{ p_next = *supported_features_14 };
@@ -350,7 +480,7 @@ create_device :: (physical_device: VK.Physical_Device, gfx_qfi: u32) -> VK.Devic
     queue_priorities := float.[1];
     device_queue_create_infos := VK.Device_Queue_Create_Info.[
         {
-            queue_family_index = gfx_qfi,
+            queue_family_index = graphics_qfi,
             queue_count        = 1,
             p_queue_priorities = queue_priorities.data,
         },
