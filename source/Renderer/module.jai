@@ -41,6 +41,7 @@ Swapchain_Info :: struct {
 Depth_Info :: struct {
     image:      VK.Image;
     allocation: VMA.Allocation;
+    image_view: VK.Image_View;
 }
 
 init :: (
@@ -78,13 +79,13 @@ init :: (
         should_check_format = true,
     );
 
-    renderer.depth_info = create_depth(renderer.swapchain_info.config.image_extent, renderer.allocator);
+    renderer.depth_info = create_depth(renderer.device, renderer.swapchain_info.config.image_extent, renderer.allocator);
 
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
-    destroy_depth(renderer.allocator, *renderer.depth_info);
+    destroy_depth(renderer.device, renderer.allocator, *renderer.depth_info);
 
     destroy_swapchain(renderer.device, *renderer.swapchain_info);
 
@@ -114,38 +115,57 @@ ASSERT_SUCCESS :: (name: string) #expand {
     assert(`result == .SUCCESS, name);
 }
 
-destroy_depth :: (allocator: VMA.Allocator, depth_info: *Depth_Info) {
+destroy_depth :: (device: VK.Device, allocator: VMA.Allocator, depth_info: *Depth_Info) {
+    VK.destroy_image_view(device, depth_info.image_view);
+
     VMA.destroy_image(allocator, depth_info.image, depth_info.allocation);
 
     depth_info.* = {};
 }
 
-create_depth :: (swapchain_image_extent: VK.Extent_2D, allocator: VMA.Allocator) -> Depth_Info {
+create_depth :: (device: VK.Device, swapchain_image_extent: VK.Extent_2D, allocator: VMA.Allocator) -> Depth_Info {
     depth_info: Depth_Info;
 
-    image_create_info := VK.Image_Create_Info.{
-        image_type = ._2D,
-        format     = DEPTH_FORMAT,
-        extent     = {
-            width  = swapchain_image_extent.width,
-            height = swapchain_image_extent.height,
-            depth  = 1,
-        },
-        mip_levels     = 1,
-        array_layers   = 1,
-        samples        = ._1,
-        tiling         = .OPTIMAL,
-        usage          = .DEPTH_STENCIL_ATTACHMENT,
-        initial_layout = .UNDEFINED,
-    };
+    { // Image
+        image_create_info := VK.Image_Create_Info.{
+            image_type = ._2D,
+            format     = DEPTH_FORMAT,
+            extent     = {
+                width  = swapchain_image_extent.width,
+                height = swapchain_image_extent.height,
+                depth  = 1,
+            },
+            mip_levels     = 1,
+            array_layers   = 1,
+            samples        = ._1,
+            tiling         = .OPTIMAL,
+            usage          = .DEPTH_STENCIL_ATTACHMENT,
+            initial_layout = .UNDEFINED,
+        };
 
-    allocation_create_info := VMA.Allocation_Create_Info.{
-        flags = .DEDICATED_MEMORY,
-        usage = .AUTO,
-    };
+        allocation_create_info := VMA.Allocation_Create_Info.{
+            flags = .DEDICATED_MEMORY,
+            usage = .AUTO,
+        };
 
-    result:, depth_info.image, depth_info.allocation = VMA.create_image(allocator, *image_create_info, *allocation_create_info);
-    ASSERT_SUCCESS("Depth image");
+        result:, depth_info.image, depth_info.allocation = VMA.create_image(allocator, *image_create_info, *allocation_create_info);
+        ASSERT_SUCCESS("Depth image");
+    }
+
+    { // Image view
+        image_view_create_info := VK.Image_View_Create_Info.{
+            image             = depth_info.image,
+            view_type         = ._2D,
+            format            = DEPTH_FORMAT,
+            subresource_range = {
+                aspect_mask = .DEPTH,
+                level_count = 1,
+                layer_count = 1,
+            },
+        };
+
+        result:, depth_info.image_view = VK.create_image_view(device, *image_view_create_info);
+    }
 
     return depth_info;
 }
