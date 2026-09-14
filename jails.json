@@ -3,7 +3,8 @@
         "source/main.jai",
         "install_tools.jai",
         "build.jai",
-        "modules/SDL3/generate.jai"
+        "modules/SDL3/generate.jai",
+        "modules/Tiny_Gltf/generate.jai"
     ],
     "build_root": "build.jai",
     "intermediate_path": ".build",

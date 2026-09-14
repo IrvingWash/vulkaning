@@ -7,3 +7,6 @@
 [submodule "modules/Vulkan_Memory_Allocator/Vulkan-Headers"]
 	path = modules/Vulkan_Memory_Allocator/Vulkan-Headers
 	url = git@github.com:KhronosGroup/Vulkan-Headers.git
+[submodule "modules/Tiny_GlTF/tinygltf"]
+	path = modules/Tiny_GlTF/tinygltf
+	url = git@github.com:syoyo/tinygltf.git
