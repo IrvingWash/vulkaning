@@ -11,7 +11,7 @@ Renderer :: #import,dir "Renderer"()(
     DEBUG       = DEBUG
 );
 
-Tiny_GLTF :: #import "Tiny_GLTF"()(DEBUG = DEBUG);
+TG :: #import "Tiny_GLTF"()(DEBUG = DEBUG);
 
 State :: struct {
     is_running: bool;
