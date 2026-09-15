@@ -700,6 +700,12 @@ Offset_2D :: struct {
     y: s32;
 }
 
+Offset_3D :: struct {
+    x: s32;
+    y: s32;
+    z: s32;
+}
+
 Viewport :: struct {
     x:         float;
     y:         float;
@@ -984,6 +990,33 @@ Present_Info_Khr :: struct {
     p_swapchains:         *Swapchain_Khr;
     p_image_indices:      *u32;
     p_results:            *Result;
+}
+
+Buffer_Create_Info :: struct {
+    s_type                    := Structure_Type.BUFFER_CREATE_INFO;
+    p_next:                   *void;
+    flags:                    Buffer_Create_Flags;
+    size:                     Device_Size;
+    usage:                    Buffer_Usage_Flags;
+    sharing_mode:             Sharing_Mode;
+    queue_family_index_count: u32;
+    p_queue_family_indices:   *u32;
+};
+
+Buffer_Image_Copy :: struct {
+    buffer_offset: Device_Size;
+    buffer_row_length: u32;
+    buffer_image_height: u32;
+    image_subresource: Image_Subresource_Layers;
+    image_offset: Offset_3D;
+    image_extent: Extent_3D;
+};
+
+Image_Subresource_Layers :: struct {
+    aspect_mask:      Image_Aspect_Flags;
+    mip_level:        u32;
+    base_array_layer: u32;
+    layer_count:      u32;
 }
 
 Dependency_Flags :: enum_flags u32 {
@@ -1628,6 +1661,52 @@ Submit_Flags :: enum_flags u32 {
     PROTECTED     :: 0x00000001;
     PROTECTED_KHR :: PROTECTED;
 };
+
+Buffer_Usage_Flags :: enum_flags u32 {
+    TRANSFER_SRC                                    :: 0x00000001;
+    TRANSFER_DST                                    :: 0x00000002;
+    UNIFORM_TEXEL_BUFFER                            :: 0x00000004;
+    STORAGE_TEXEL_BUFFER                            :: 0x00000008;
+    UNIFORM_BUFFER                                  :: 0x00000010;
+    STORAGE_BUFFER                                  :: 0x00000020;
+    INDEX_BUFFER                                    :: 0x00000040;
+    VERTEX_BUFFER                                   :: 0x00000080;
+    INDIRECT_BUFFER                                 :: 0x00000100;
+    SHADER_DEVICE_ADDRESS                           :: 0x00020000;
+    VIDEO_DECODE_SRCKHR                             :: 0x00002000;
+    VIDEO_DECODE_DSTKHR                             :: 0x00004000;
+    TRANSFORM_FEEDBACK_BUFFEREXT                    :: 0x00000800;
+    TRANSFORM_FEEDBACK_COUNTER_BUFFEREXT            :: 0x00001000;
+    CONDITIONAL_RENDERINGEXT                        :: 0x00000200;
+    EXECUTION_GRAPH_SCRATCHAMDX                     :: 0x02000000;
+    DESCRIPTOR_HEAPEXT                              :: 0x10000000;
+    ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLYKHR :: 0x00080000;
+    ACCELERATION_STRUCTURE_STORAGEKHR               :: 0x00100000;
+    SHADER_BINDING_TABLEKHR                         :: 0x00000400;
+    VIDEO_ENCODE_DSTKHR                             :: 0x00008000;
+    VIDEO_ENCODE_SRCKHR                             :: 0x00010000;
+    SAMPLER_DESCRIPTOR_BUFFEREXT                    :: 0x00200000;
+    RESOURCE_DESCRIPTOR_BUFFEREXT                   :: 0x00400000;
+    PUSH_DESCRIPTORS_DESCRIPTOR_BUFFEREXT           :: 0x04000000;
+    MICROMAP_BUILD_INPUT_READ_ONLYEXT               :: 0x00800000;
+    MICROMAP_STORAGEEXT                             :: 0x01000000;
+    TILE_MEMORYQCOM                                 :: 0x08000000;
+    RAY_TRACINGNV                                   :: SHADER_BINDING_TABLEKHR;
+    SHADER_DEVICE_ADDRESSEXT                        :: SHADER_DEVICE_ADDRESS;
+    SHADER_DEVICE_ADDRESSKHR                        :: SHADER_DEVICE_ADDRESS;
+}
+
+Buffer_Create_Flags :: enum_flags u32 {
+    SPARSE_BINDING_BIT                       :: 0x00000001;
+    SPARSE_RESIDENCY_BIT                     :: 0x00000002;
+    SPARSE_ALIASED_BIT                       :: 0x00000004;
+    PROTECTED_BIT                            :: 0x00000008;
+    DEVICE_ADDRESS_CAPTURE_REPLAY_BIT        :: 0x00000010;
+    DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT :: 0x00000020;
+    VIDEO_PROFILE_INDEPENDENT_BIT_KHR        :: 0x00000040;
+    DEVICE_ADDRESS_CAPTURE_REPLAY_BIT_EXT    :: DEVICE_ADDRESS_CAPTURE_REPLAY_BIT;
+    DEVICE_ADDRESS_CAPTURE_REPLAY_BIT_KHR    :: DEVICE_ADDRESS_CAPTURE_REPLAY_BIT;
+}
 
 Structure_Type :: enum u32 {
     APPLICATION_INFO                                                       :: 0;
@@ -4506,6 +4585,15 @@ queue_present_khr :: (
     queue: Queue,
     p_present_info: *Present_Info_Khr,
 ) -> Result #foreign libvulkan "vkQueuePresentKHR";
+
+cmd_copy_buffer_to_image :: (
+    command_buffer: Command_Buffer,
+    src_buffer: Buffer,
+    dst_image: Image,
+    dst_image_layout: Image_Layout,
+    region_count: u32,
+    p_regions: *Buffer_Image_Copy,
+) -> void #foreign libvulkan "vkCmdCopyBufferToImage";
 
 
 

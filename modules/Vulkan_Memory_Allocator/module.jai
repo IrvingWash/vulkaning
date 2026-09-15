@@ -178,6 +178,41 @@ destroy_image :: (
     allocation: Allocation,
 ) -> void #foreign libvma "vmaDestroyImage";
 
+create_buffer :: inline (
+    allocator:                Allocator,
+    p_buffer_create_info:     *Buffer_Create_Info,
+    p_allocation_create_info: *Allocation_Create_Info,
+) -> Result,
+    Buffer,
+    Allocation,
+    Allocation_Info
+{
+    buffer:          Buffer;
+    allocation:      Allocation;
+    allocation_info: Allocation_Info;
+
+    result := vmaCreateBuffer(
+        allocator,
+        p_buffer_create_info,
+        p_allocation_create_info,
+        *buffer,
+        *allocation,
+        *allocation_info,
+    );
+
+    return result, buffer, allocation, allocation_info;
+}
+
+map_memory :: inline (allocator: Allocator, allocation: Allocation) -> Result, *void {
+    data: *void;
+
+    result := vmaMapMemory(allocator, allocation, *data);
+
+    return result, data;
+}
+
+unmap_memory :: (allocator: Allocator, allocation: Allocation ) -> void #foreign libvma "vmaUnmapMemory";
+
 
 
 #scope_file
@@ -198,6 +233,21 @@ vmaCreateImage :: (
     p_image:                  *Image,
     p_allocation:             *Allocation,
     p_allocation_info:        *Allocation_Info,
+) -> Result #foreign libvma;
+
+vmaCreateBuffer :: (
+    allocator:                Allocator,
+    p_buffer_create_info:     *Buffer_Create_Info,
+    p_allocation_create_info: *Allocation_Create_Info,
+    p_buffer:                 *Buffer,
+    p_allocation:             *Allocation,
+    p_allocation_info:        *Allocation_Info,
+) -> Result #foreign libvma;
+
+vmaMapMemory :: (
+    allocator:  Allocator,
+    allocation: Allocation,
+    pp_data:    **void,
 ) -> Result #foreign libvma;
 
 #if OS == {

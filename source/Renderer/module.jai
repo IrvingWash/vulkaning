@@ -1,5 +1,7 @@
 #module_parameters()(Window_Type: Type, DEBUG := false);
 
+#load "model.jai";
+
 Additional_Instance_Extensions_Getter :: #type () -> [..]*u8;
 Window_Pixel_Size_Getter              :: #type (window: Window_Type) -> width: s32, height: s32;
 
@@ -25,12 +27,14 @@ Renderer :: struct {
     allocator: VMA.Allocator;
 
     swapchain_info: Swapchain_Info;
-    depth_info:     Depth_Info;
+    depth_image:     GPU_Image;
 
     graphics_pipeline_info: Graphics_Pipeline_Info;
 
     timeline_semaphore: VK.Semaphore;
     frame_resources_list: [MAX_FRAMES_IN_FLIGHT_COUNT]Frame_Resources;
+
+    transient_command_pool: VK.Command_Pool;
 
     should_recreate_swapchain: bool;
     frame_index:               u64;
@@ -46,12 +50,6 @@ Swapchain_Info :: struct {
     render_complete_semaphores: [..]VK.Semaphore;
 }
 
-Depth_Info :: struct {
-    image:      VK.Image;
-    allocation: VMA.Allocation;
-    image_view: VK.Image_View;
-}
-
 Graphics_Pipeline_Info :: struct {
     pipeline: VK.Pipeline;
     layout:   VK.Pipeline_Layout;
@@ -61,6 +59,19 @@ Frame_Resources :: struct {
     command_pool:             VK.Command_Pool;
     command_buffer:           VK.Command_Buffer;
     image_acquired_semaphore: VK.Semaphore;
+}
+
+GPU_Image :: struct {
+    image:      VK.Image;
+    image_view: VK.Image_View;
+    allocation: VMA.Allocation;
+}
+
+GPU_Buffer :: struct {
+    buffer:          VK.Buffer;
+    allocation:      VMA.Allocation;
+    allocation_info: VMA.Allocation_Info;
+    device_address:  u64;
 }
 
 init :: (
@@ -98,18 +109,24 @@ init :: (
         should_check_format = true,
     );
 
-    renderer.depth_info = create_depth(renderer.device, renderer.swapchain_info.config.image_extent, renderer.allocator);
+    renderer.depth_image = create_depth_image(renderer.device, renderer.swapchain_info.config.image_extent, renderer.allocator);
 
     renderer.graphics_pipeline_info = create_graphics_pipeline(renderer.device);
 
     renderer.timeline_semaphore = create_timeline_semaphore(renderer.device);
     renderer.frame_resources_list = create_frame_resources(renderer.device, renderer.graphics_qfi);
 
+    renderer.transient_command_pool = create_transient_command_pool(renderer.device, renderer.graphics_qfi);
+
+    create_white_pixel_image(renderer.allocator, renderer.device, renderer.transient_command_pool);
+
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
     VK.device_wait_idle(renderer.device);
+
+    VK.destroy_command_pool(renderer.device, renderer.transient_command_pool);
 
     for *frame_resources: renderer.frame_resources_list {
         destroy_frame_resources(renderer.device, frame_resources);
@@ -119,7 +136,7 @@ deinit :: (renderer: *Renderer) {
 
     destroy_graphics_pipeline(renderer.device, *renderer.graphics_pipeline_info);
 
-    destroy_depth(renderer.device, renderer.allocator, *renderer.depth_info);
+    destroy_depth_image(renderer.device, renderer.allocator, *renderer.depth_image);
 
     destroy_swapchain(renderer.device, *renderer.swapchain_info);
 
@@ -139,7 +156,7 @@ render :: (renderer: *Renderer) {
         VK.device_wait_idle(renderer.device);
 
         destroy_swapchain(renderer.device, *renderer.swapchain_info);
-        destroy_depth(renderer.device, renderer.allocator, *renderer.depth_info);
+        destroy_depth_image(renderer.device, renderer.allocator, *renderer.depth_image);
 
         renderer.swapchain_info = create_swapchain(
             renderer.physical_device,
@@ -149,7 +166,7 @@ render :: (renderer: *Renderer) {
             renderer.get_window_pixel_size,
         );
 
-        renderer.depth_info = create_depth(
+        renderer.depth_image = create_depth_image(
             renderer.device,
             renderer.swapchain_info.config.image_extent,
             renderer.allocator,
@@ -196,10 +213,10 @@ render :: (renderer: *Renderer) {
         ASSERT_SUCCESS("Acquire next image");
     }
 
-    cmd_begin_info := VK.Command_Buffer_Begin_Info.{
+    command_buffer_begin_info := VK.Command_Buffer_Begin_Info.{
         flags = .ONE_TIME_SUBMIT,
     };
-    result = VK.begin_command_buffer(frame_resources.command_buffer, *cmd_begin_info);
+    result = VK.begin_command_buffer(frame_resources.command_buffer, *command_buffer_begin_info);
     ASSERT_SUCCESS("Begin command buffer");
 
     // We need to transition images to the renderable state, because it was in a presentable state previously
@@ -227,7 +244,7 @@ render :: (renderer: *Renderer) {
             dst_access_mask = .DEPTH_STENCIL_ATTACHMENT_WRITE,
             old_layout      = .UNDEFINED,
             new_layout      = .DEPTH_ATTACHMENT_OPTIMAL,
-            image           = renderer.depth_info.image,
+            image           = renderer.depth_image.image,
             subresource_range = {
                 aspect_mask      = .DEPTH,
                 base_mip_level   = 0,
@@ -253,7 +270,7 @@ render :: (renderer: *Renderer) {
     };
 
     depth_rendering_attachment_info := VK.Rendering_Attachment_Info.{
-        image_view                      = renderer.depth_info.image_view,
+        image_view                      = renderer.depth_image.image_view,
         image_layout                    = .DEPTH_ATTACHMENT_OPTIMAL,
         load_op                         = .CLEAR,
         store_op                        = .DONT_CARE,
@@ -347,7 +364,7 @@ render :: (renderer: *Renderer) {
         },
     ];
 
-    cmd_submit_info := VK.Command_Buffer_Submit_Info.{
+    command_buffer_submit_info := VK.Command_Buffer_Submit_Info.{
         command_buffer = frame_resources.command_buffer,
     };
 
@@ -355,7 +372,7 @@ render :: (renderer: *Renderer) {
         wait_semaphore_info_count   = 1,
         p_wait_semaphore_infos      = *image_acquired_wait_info,
         command_buffer_info_count   = 1,
-        p_command_buffer_infos      = *cmd_submit_info,
+        p_command_buffer_infos      = *command_buffer_submit_info,
         signal_semaphore_info_count = semaphore_signals.count,
         p_signal_semaphore_infos    = semaphore_signals.data,
     };
@@ -390,6 +407,185 @@ MAX_FRAMES_IN_FLIGHT_COUNT :: 2;
 
 ASSERT_SUCCESS :: (name: string) #expand {
     assert(`result == .SUCCESS, name);
+}
+
+create_white_pixel_image :: (allocator: VMA.Allocator, device: VK.Device, command_pool: VK.Command_Pool) {
+    white: u32 = 0xFFFFFFFF;
+
+    white_pixel := Image.{
+        width         = 1,
+        height        = 1,
+        channel_count = 4,
+        data          = cast(*u8, *white),
+    };
+
+    command_buffer := start_transient_command_buffer(device, command_pool);
+
+    create_gpu_image(device, allocator, command_buffer, white_pixel);
+
+    // @Todo
+}
+
+create_gpu_image :: (device: VK.Device, allocator: VMA.Allocator, command_buffer: VK.Command_Buffer, image: Image) {
+    gpu_image: GPU_Image = ---;
+
+    image_create_info := VK.Image_Create_Info.{
+        image_type = ._2D,
+        format     = .R8G8B8A8_SRGB,
+        extent     = {
+            width  = xx image.width,
+            height = xx image.height,
+            depth  = 1,
+        },
+        mip_levels     = 1,
+        array_layers   = 1,
+        samples        = ._1,
+        tiling         = .OPTIMAL,
+        usage          = .TRANSFER_DST | .SAMPLED,
+        initial_layout = .UNDEFINED,
+    };
+
+    allocation_create_info := VMA.Allocation_Create_Info.{ usage = .AUTO };
+
+    result:, gpu_image.image, gpu_image.allocation = VMA.create_image(allocator, *image_create_info, *allocation_create_info);
+    ASSERT_SUCCESS("Create image");
+
+    image_view_create_info := VK.Image_View_Create_Info.{
+        image     = gpu_image.image,
+        view_type = ._2D,
+        format    = image_create_info.format,
+        subresource_range = {
+            aspect_mask = .COLOR,
+            level_count = 1,
+            layer_count = 1,
+        },
+    };
+
+    result, gpu_image.image_view = VK.create_image_view(device, *image_view_create_info);
+    ASSERT_SUCCESS("Create image view");
+
+    transfer_barrier := VK.Image_Memory_Barrier_2.{
+        src_stage_mask  = .NONE,
+        src_access_mask = .NONE,
+        dst_stage_mask  = .COPY,
+        dst_access_mask = .TRANSFER_WRITE,
+        old_layout      = .UNDEFINED,
+        new_layout      = .TRANSFER_DST_OPTIMAL,
+        image           = gpu_image.image,
+        subresource_range = {
+            aspect_mask = .COLOR,
+            level_count = 1,
+            layer_count = 1,
+        },
+    };
+
+    transfer_dependency_info := VK.Dependency_Info.{
+        image_memory_barrier_count = 1,
+        p_image_memory_barriers    = *transfer_barrier,
+    };
+
+    VK.cmd_pipeline_barrier_2(command_buffer, *transfer_dependency_info);
+
+    byte_size := image.width * image.height * image.channel_count;
+    staging_buffer := create_buffer(allocator, .TRANSFER_SRC, xx byte_size, .AUTO_PREFER_HOST, mappable = true);
+
+    map_copy_buffer_data(allocator, staging_buffer, 0, image.data, byte_size);
+
+    buffer_image_copy := VK.Buffer_Image_Copy.{
+        image_subresource = {
+            aspect_mask      = .COLOR,
+            mip_level        = 0,
+            base_array_layer = 0,
+            layer_count      = 1,
+        },
+        image_extent = {
+            width  = xx image.width,
+            height = xx image.height,
+            depth  = 1,
+        },
+    };
+
+    VK.cmd_copy_buffer_to_image(
+        command_buffer,
+        staging_buffer.buffer,
+        gpu_image.image,
+        .TRANSFER_DST_OPTIMAL,
+        1,
+        *buffer_image_copy,
+    );
+
+    // @Todo
+}
+
+map_copy_buffer_data :: (allocator: VMA.Allocator, buffer: GPU_Buffer, buffer_offset: u64, data: *void, byte_size: int) {
+    result, buffer_pointer := VMA.map_memory(allocator, buffer.allocation);
+    ASSERT_SUCCESS("Map memory");
+
+    memcpy(buffer_pointer + buffer_offset, data, byte_size);
+
+    VMA.unmap_memory(allocator, buffer.allocation);
+}
+
+create_buffer :: (
+    allocator: VMA.Allocator,
+    usage: VK.Buffer_Usage_Flags,
+    byte_size: u64,
+    memory_usage: VMA.Memory_Usage,
+    mappable: bool,
+) -> GPU_Buffer {
+    buffer: GPU_Buffer = ---;
+
+    buffer_create_info := VK.Buffer_Create_Info.{
+        size         = byte_size,
+        usage        = usage,
+        sharing_mode = .EXCLUSIVE,
+    };
+
+    allocation_create_info := VMA.Allocation_Create_Info.{
+        flags = ifx mappable then VMA.Allocation_Create_Flags.HOST_ACCESS_SEQUENTIAL_WRITE else 0,
+        usage = memory_usage,
+    };
+
+    result:, buffer.buffer, buffer.allocation, buffer.allocation_info = VMA.create_buffer(
+        allocator,
+        *buffer_create_info,
+        *allocation_create_info,
+    );
+    ASSERT_SUCCESS("Create buffer");
+
+    return buffer;
+}
+
+start_transient_command_buffer :: (device: VK.Device, command_pool: VK.Command_Pool) -> VK.Command_Buffer {
+    command_buffer_allocate_info := VK.Command_Buffer_Allocate_Info.{
+        command_pool         = command_pool,
+        level                = .PRIMARY,
+        command_buffer_count = 1,
+    };
+
+    result, command_buffer := VK.allocate_command_buffer(device, *command_buffer_allocate_info);
+    ASSERT_SUCCESS("Transient command buffer");
+
+    command_buffer_begin_info := VK.Command_Buffer_Begin_Info.{
+        flags = .ONE_TIME_SUBMIT,
+    };
+
+    result = VK.begin_command_buffer(command_buffer, *command_buffer_begin_info);
+    ASSERT_SUCCESS("Begin transient command buffer");
+
+    return command_buffer;
+}
+
+create_transient_command_pool :: (device: VK.Device, qfi: u32) -> VK.Command_Pool {
+    command_pool_create_info := VK.Command_Pool_Create_Info.{
+        flags              = .TRANSIENT,
+        queue_family_index = qfi,
+    };
+
+    result, command_pool := VK.create_command_pool(device, *command_pool_create_info);
+    ASSERT_SUCCESS("Transient command pool");
+
+    return command_pool;
 }
 
 destroy_frame_resources :: (
@@ -588,7 +784,7 @@ create_shader_module :: (device: VK.Device, name: string) -> VK.Shader_Module {
     return shader_module;
 }
 
-destroy_depth :: (device: VK.Device, allocator: VMA.Allocator, depth_info: *Depth_Info) {
+destroy_depth_image :: (device: VK.Device, allocator: VMA.Allocator, depth_info: *GPU_Image) {
     VK.destroy_image_view(device, depth_info.image_view);
 
     VMA.destroy_image(allocator, depth_info.image, depth_info.allocation);
@@ -596,8 +792,8 @@ destroy_depth :: (device: VK.Device, allocator: VMA.Allocator, depth_info: *Dept
     depth_info.* = {};
 }
 
-create_depth :: (device: VK.Device, swapchain_image_extent: VK.Extent_2D, allocator: VMA.Allocator) -> Depth_Info {
-    depth_info: Depth_Info;
+create_depth_image :: (device: VK.Device, swapchain_image_extent: VK.Extent_2D, allocator: VMA.Allocator) -> GPU_Image {
+    depth_image: GPU_Image;
 
     { // Image
         image_create_info := VK.Image_Create_Info.{
@@ -621,13 +817,13 @@ create_depth :: (device: VK.Device, swapchain_image_extent: VK.Extent_2D, alloca
             usage = .AUTO,
         };
 
-        result:, depth_info.image, depth_info.allocation = VMA.create_image(allocator, *image_create_info, *allocation_create_info);
+        result:, depth_image.image, depth_image.allocation = VMA.create_image(allocator, *image_create_info, *allocation_create_info);
         ASSERT_SUCCESS("Depth image");
     }
 
     { // Image view
         image_view_create_info := VK.Image_View_Create_Info.{
-            image             = depth_info.image,
+            image             = depth_image.image,
             view_type         = ._2D,
             format            = DEPTH_FORMAT,
             subresource_range = {
@@ -637,10 +833,10 @@ create_depth :: (device: VK.Device, swapchain_image_extent: VK.Extent_2D, alloca
             },
         };
 
-        result:, depth_info.image_view = VK.create_image_view(device, *image_view_create_info);
+        result:, depth_image.image_view = VK.create_image_view(device, *image_view_create_info);
     }
 
-    return depth_info;
+    return depth_image;
 }
 
 destroy_swapchain :: (device: VK.Device, swapchain_info: *Swapchain_Info) {
