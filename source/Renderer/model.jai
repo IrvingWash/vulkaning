@@ -18,3 +18,8 @@ Image :: struct {
     channel_count: int;
     data:          *u8;
 }
+
+Texture :: struct {
+    image_id:   u32;
+    sampler_id: u32;
+}

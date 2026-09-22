@@ -40,8 +40,10 @@ Renderer :: struct {
     frame_index:               u64;
     next_signal_value:         u64 = MAX_FRAMES_IN_FLIGHT_COUNT + 1; // I guess this is because we initialize the timeline_semaphore with MAX_FRAMES_IN_FLIGHT_COUNT
 
-    white_pixel_image: GPU_Image;
-    fallback_sampler:  VK.Sampler;
+    white_pixel_texture: Texture;
+
+    gpu_images: [..]GPU_Image;
+    samplers:   [..]VK.Sampler;
 }
 
 Swapchain_Info :: struct {
@@ -121,14 +123,22 @@ init :: (
 
     renderer.transient_command_pool = create_transient_command_pool(renderer.device, renderer.graphics_qfi);
 
-    renderer.white_pixel_image = create_white_pixel_image(
-        renderer.graphics_queue,
-        renderer.allocator,
-        renderer.device,
-        renderer.transient_command_pool,
+    array_add(
+        *renderer.gpu_images,
+        create_white_pixel_image(
+            renderer.graphics_queue,
+            renderer.allocator,
+            renderer.device,
+            renderer.transient_command_pool,
+        ),
     );
+    renderer.white_pixel_texture.image_id = xx renderer.gpu_images.count;
 
-    renderer.fallback_sampler = create_fallback_sampler(renderer.device);
+    array_add(
+        *renderer.samplers,
+        create_white_pixel_sampler(renderer.device),
+    );
+    renderer.white_pixel_texture.sampler_id = xx renderer.samplers.count;
 
     return renderer;
 }
@@ -136,8 +146,15 @@ init :: (
 deinit :: (renderer: *Renderer) {
     VK.device_wait_idle(renderer.device);
 
-    VK.destroy_sampler(renderer.device, renderer.fallback_sampler);
-    destroy_white_pixel_image(renderer.device, renderer.allocator, renderer.white_pixel_image);
+    for sampler: renderer.samplers {
+        VK.destroy_sampler(renderer.device, sampler);
+    }
+    array_free(renderer.samplers);
+
+    for image: renderer.gpu_images {
+        destroy_gpu_image(renderer.device, renderer.allocator, image);
+    }
+    array_free(renderer.gpu_images);
 
     VK.destroy_command_pool(renderer.device, renderer.transient_command_pool);
 
@@ -422,7 +439,7 @@ ASSERT_SUCCESS :: (name: string) #expand {
     assert(`result == .SUCCESS, name);
 }
 
-create_fallback_sampler :: (device: VK.Device) -> VK.Sampler {
+create_white_pixel_sampler :: (device: VK.Device) -> VK.Sampler {
     sampler_create_info := VK.Sampler_Create_Info.{
         mag_filter     = .NEAREST,
         min_filter     = .NEAREST,
@@ -433,15 +450,15 @@ create_fallback_sampler :: (device: VK.Device) -> VK.Sampler {
     };
 
     result, sampler := VK.create_sampler(device, *sampler_create_info);
-    ASSERT_SUCCESS("Create fallback sampler");
+    ASSERT_SUCCESS("Create white pixel sampler");
 
     return sampler;
 }
 
-destroy_white_pixel_image :: (device: VK.Device, allocator: VMA.Allocator, white_pixel_image: GPU_Image) {
-    VK.destroy_image_view(device, white_pixel_image.image_view);
+destroy_gpu_image :: (device: VK.Device, allocator: VMA.Allocator, gpu_image: GPU_Image) {
+    VK.destroy_image_view(device, gpu_image.image_view);
 
-    VMA.destroy_image(allocator, white_pixel_image.image, white_pixel_image.allocation);
+    VMA.destroy_image(allocator, gpu_image.image, gpu_image.allocation);
 }
 
 create_white_pixel_image :: (
@@ -880,9 +897,7 @@ create_shader_module :: (device: VK.Device, name: string) -> VK.Shader_Module {
 }
 
 destroy_depth_image :: (device: VK.Device, allocator: VMA.Allocator, depth_info: *GPU_Image) {
-    VK.destroy_image_view(device, depth_info.image_view);
-
-    VMA.destroy_image(allocator, depth_info.image, depth_info.allocation);
+    destroy_gpu_image(device, allocator, depth_info);
 
     depth_info.* = {};
 }
