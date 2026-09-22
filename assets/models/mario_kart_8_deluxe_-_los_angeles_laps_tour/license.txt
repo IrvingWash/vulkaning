@@ -1,0 +1,11 @@
+Model Information:
+* title:	Mario Kart 8 Deluxe - Los Angeles Laps (Tour)
+* source:	https://sketchfab.com/3d-models/mario-kart-8-deluxe-los-angeles-laps-tour-45dfd14be9fb465387d0b8917d35954d
+* author:	H,yoshi (https://sketchfab.com/HY2245)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Mario Kart 8 Deluxe - Los Angeles Laps (Tour)" (https://sketchfab.com/3d-models/mario-kart-8-deluxe-los-angeles-laps-tour-45dfd14be9fb465387d0b8917d35954d) by H,yoshi (https://sketchfab.com/HY2245) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

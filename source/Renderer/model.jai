@@ -1,11 +1,11 @@
 Node :: struct {
     translation: Vector3;
     scale:       Vector3 = { 1, 1, 1 };
-    roation:     Quaternion;
+    rotation:     Quaternion;
     transform:   Matrix4 = Matrix4_Identity;
 
     mesh_id:         u32;
-    parend_id:       u32;
+    parent_id:       u32;
     next_sibling_id: u32;
     first_child_id:  u32;
 
@@ -51,14 +51,19 @@ Vertex :: struct {
 }
 
 make_transformation_matrix :: (node: *Node) {
-    if !node.dirty {
-        return node.transform;
-    }
+    if !node.dirty return;
 
     translation := make_translation_matrix4(node.translation);
     rotation    := rotation_matrix(Matrix4, node.rotation);
     scaling     := make_scale_matrix4(node.scale);
 
-    node.trasnform = translation * rotation * scaling;
+    node.transform = translation * rotation * scaling;
     node.dirty = false;
+}
+
+destroy_mesh :: (mesh: *Mesh) {
+    free(mesh.name);
+    array_free(mesh.sub_meshes);
+
+    mesh.* = {};
 }

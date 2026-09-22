@@ -53,6 +53,12 @@ Renderer :: struct {
     index_offset:  u64;
 
     meshes: [..]Mesh;
+
+    buffers: [..]GPU_Buffer;
+    vertex_buffer_id: int;
+    index_buffer_id:  int;
+
+    dirty: bool = true;
 }
 
 Create_Sampler_Params :: #type VK.Sampler_Create_Info;
@@ -161,9 +167,6 @@ init :: (
     );
     renderer.white_pixel_texture.sampler_id = xx renderer.samplers.count;
 
-    VERTEX_BUFFER_SIZE :: 64 * 1024 * 1024;
-    INDEX_BUFFER_SIZE  :: 32 * 1024 * 1024;
-
     array_resize(*renderer.vertices, VERTEX_BUFFER_SIZE / size_of(Vertex));
     array_resize(*renderer.indices, INDEX_BUFFER_SIZE / size_of(u32));
 
@@ -173,7 +176,16 @@ init :: (
 deinit :: (renderer: *Renderer) {
     VK.device_wait_idle(renderer.device);
 
+    for buffer: renderer.buffers {
+        VMA.destroy_buffer(renderer.allocator, buffer.buffer, buffer.allocation);
+    }
+    array_free(renderer.buffers);
+
+    for *mesh: renderer.meshes {
+        destroy_mesh(mesh);
+    }
     array_free(renderer.meshes);
+
     array_free(renderer.indices);
     array_free(renderer.vertices);
     array_free(renderer.materials);
@@ -269,6 +281,63 @@ upload_images :: (renderer: *Renderer, images: []Image) -> image_ids: [..]u32 {
     );
 
     return gpu_image_ids;
+}
+
+start_rendering :: (renderer: *Renderer) {
+    if !renderer.dirty {
+        return;
+    }
+
+    defer renderer.dirty = false;
+
+    vertex_staging_buffer := create_buffer(
+        renderer.device, renderer.allocator, .TRANSFER_SRC, VERTEX_BUFFER_SIZE, .AUTO, mappable = true
+    );
+    defer VMA.destroy_buffer(renderer.allocator, vertex_staging_buffer.buffer, vertex_staging_buffer.allocation);
+    map_copy_buffer_data(renderer.allocator, vertex_staging_buffer, 0, renderer.vertices.data, VERTEX_BUFFER_SIZE);
+
+    index_staging_buffer  := create_buffer(
+        renderer.device, renderer.allocator, .TRANSFER_SRC, INDEX_BUFFER_SIZE, .AUTO, mappable = true
+    );
+    defer VMA.destroy_buffer(renderer.allocator, index_staging_buffer.buffer, index_staging_buffer.allocation);
+    map_copy_buffer_data(renderer.allocator, index_staging_buffer, 0, renderer.indices.data, INDEX_BUFFER_SIZE);
+
+    vertex_buffer := create_buffer(
+        renderer.device,
+        renderer.allocator,
+        .TRANSFER_DST | .SHADER_DEVICE_ADDRESS,
+        VERTEX_BUFFER_SIZE,
+        .AUTO,
+        mappable = false,
+    );
+    renderer.vertex_buffer_id = add_buffer(*renderer.buffers, vertex_buffer);
+
+    index_buffer := create_buffer(
+        renderer.device,
+        renderer.allocator,
+        .TRANSFER_DST | .INDEX_BUFFER,
+        INDEX_BUFFER_SIZE,
+        .AUTO,
+        mappable = false,
+    );
+    renderer.index_buffer_id = add_buffer(*renderer.buffers, index_buffer);
+
+    command_buffer := start_transient_command_buffer(renderer.device, renderer.transient_command_pool);
+
+    vertex_buffer_copy := VK.Buffer_Copy.{
+        src_offset = 0,
+        dst_offset = 0,
+        size       = VERTEX_BUFFER_SIZE,
+    };
+    index_buffer_copy := VK.Buffer_Copy.{
+        src_offset = 0,
+        dst_offset = 0,
+        size       = INDEX_BUFFER_SIZE,
+    };
+    VK.cmd_copy_buffer(command_buffer, vertex_staging_buffer.buffer, vertex_buffer.buffer, .[vertex_buffer_copy]);
+    VK.cmd_copy_buffer(command_buffer, index_staging_buffer.buffer, index_buffer.buffer, .[index_buffer_copy]);
+
+    submit_transient_command_buffer(renderer.device, renderer.transient_command_pool, renderer.graphics_queue, command_buffer);
 }
 
 render :: (renderer: *Renderer) {
@@ -516,6 +585,9 @@ render :: (renderer: *Renderer) {
 
 #scope_file
 
+VERTEX_BUFFER_SIZE :: 64 * 1024 * 1024;
+INDEX_BUFFER_SIZE  :: 32 * 1024 * 1024;
+
 VULKAN_API_VERSION :: #run VK.make_version(1, 4, 350);
 
 SURFACE_FORMAT :: VK.Format.B8G8R8A8_SRGB;
@@ -527,6 +599,12 @@ MAX_FRAMES_IN_FLIGHT_COUNT :: 2;
 
 ASSERT_SUCCESS :: (name: string) #expand {
     assert(`result == .SUCCESS, name);
+}
+
+add_buffer :: (buffers: *[..]GPU_Buffer, buffer: GPU_Buffer) -> int {
+    array_add(buffers, buffer);
+
+    return buffers.count;
 }
 
 create_sampler :: (device: VK.Device, sampler_create_info: VK.Sampler_Create_Info) -> VK.Sampler {
@@ -655,7 +733,7 @@ create_gpu_image :: (
     VK.cmd_pipeline_barrier_2(command_buffer, *transfer_dependency_info);
 
     byte_size := image.width * image.height * image.channel_count;
-    staging_buffer := create_buffer(allocator, .TRANSFER_SRC, xx byte_size, .AUTO_PREFER_HOST, mappable = true);
+    staging_buffer := create_buffer(device, allocator, .TRANSFER_SRC, xx byte_size, .AUTO_PREFER_HOST, mappable = true);
 
     map_copy_buffer_data(allocator, staging_buffer, 0, image.data, byte_size);
 
@@ -720,6 +798,7 @@ map_copy_buffer_data :: (allocator: VMA.Allocator, buffer: GPU_Buffer, buffer_of
 }
 
 create_buffer :: (
+    device: VK.Device,
     allocator: VMA.Allocator,
     usage: VK.Buffer_Usage_Flags,
     byte_size: u64,
@@ -745,6 +824,14 @@ create_buffer :: (
         *allocation_create_info,
     );
     ASSERT_SUCCESS("Create buffer");
+
+    if (usage & .SHADER_DEVICE_ADDRESS) {
+        vertex_buffer_device_address_info := VK.Buffer_Device_Address_Info.{
+            buffer = buffer.buffer,
+        };
+
+        buffer.device_address = VK.get_buffer_device_address(device, *vertex_buffer_device_address_info);
+    }
 
     return buffer;
 }

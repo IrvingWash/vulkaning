@@ -22,6 +22,8 @@ Framebuffer           :: #type *Framebuffer_T;
 Buffer                :: #type *Buffer_T;
 Sampler               :: #type *Sampler_T;
 
+Device_Address :: #type u64;
+
 Bool :: #type,isa u32;
 TRUE:  Bool : 1;
 FALSE: Bool : 0;
@@ -1053,6 +1055,18 @@ Sampler_Create_Info :: struct {
     max_lod:                  float;
     border_color:             Border_Color;
     unnormalized_coordinates: Bool;
+}
+
+Buffer_Device_Address_Info :: struct {
+    s_type  := Structure_Type.BUFFER_DEVICE_ADDRESS_INFO;
+    p_next: *void;
+    buffer: Buffer;
+}
+
+Buffer_Copy :: struct {
+    src_offset: Device_Size;
+    dst_offset: Device_Size;
+    size:       Device_Size;
 }
 
 Dependency_Flags :: enum_flags u32 {
@@ -4703,6 +4717,20 @@ destroy_sampler :: (
     p_allocator: *Allocation_Callbacks = null,
 ) -> void #foreign libvulkan "vkDestroySampler";
 
+get_buffer_device_address :: (
+    device: Device,
+    p_info: *Buffer_Device_Address_Info,
+) -> Device_Address #foreign libvulkan "vkGetBufferDeviceAddress";
+
+cmd_copy_buffer :: inline (
+    command_buffer: Command_Buffer,
+    src_buffer:     Buffer,
+    dst_buffer:     Buffer,
+    regions:        []Buffer_Copy,
+) {
+    vkCmdCopyBuffer(command_buffer, src_buffer, dst_buffer, xx regions.count, regions.data);
+}
+
 
 
 #scope_file
@@ -4903,6 +4931,15 @@ vkCreateSampler :: (
     p_allocator:   *Allocation_Callbacks,
     p_sampler:     *Sampler,
 ) -> Result #foreign libvulkan;
+
+vkCmdCopyBuffer :: (
+    command_buffer: Command_Buffer,
+    src_buffer:     Buffer,
+    dst_buffer:     Buffer,
+    region_count:   u32,
+    p_regions:      *Buffer_Copy,
+) -> void #foreign libvulkan;
+
 
 #if OS == {
     case .LINUX;

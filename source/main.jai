@@ -23,6 +23,8 @@ State :: struct {
     height: s32 = 600;
 
     renderer: Renderer.Renderer;
+
+    nodes: [..]Renderer.Node;
 }
 
 main :: () {
@@ -37,10 +39,18 @@ main :: () {
     init(*state);
     defer deinit(*state);
 
-    load_gltf_file("assets/models/Fox/Fox.gltf", *state.renderer);
+    load_gltf_file("assets/models/mario_kart_8_deluxe_-_los_angeles_laps_tour/scene.gltf", *state.renderer, *state.nodes);
+
+    root_node := *state.nodes[0];
+    root_node.scale = { 0.01, 0.01, 0.01 };
+    root_node.translation = { 0, -5, 0 };
+    root_node.dirty = true;
+    Renderer.make_transformation_matrix(root_node);
 
     while state.is_running {
         process_input(*state);
+
+        Renderer.start_rendering(*state.renderer);
 
         Renderer.render(*state.renderer);
 
@@ -65,6 +75,8 @@ init :: (state: *State) {
 }
 
 deinit :: (state: *State) {
+    array_free(state.nodes);
+
     Renderer.deinit(*state.renderer);
 
     SDL.destroy_window(state.window);
@@ -73,8 +85,9 @@ deinit :: (state: *State) {
     state.* = {};
 }
 
-load_gltf_file :: (path: string, renderer: *Renderer.Renderer) {
+load_gltf_file :: (path: string, renderer: *Renderer.Renderer, nodes: *[..]Renderer.Node) {
     gltf_model: TG.Model;
+    defer TG.model_free(*gltf_model);
 
     {
         options:     TG.Parse_Options;
@@ -340,9 +353,8 @@ load_gltf_file :: (path: string, renderer: *Renderer.Renderer) {
                             renderer.vertices[renderer.vertex_offset + gltf_accessor_index].uv = { data[0], data[1] };
                         }
                 }
-
-                renderer.vertex_offset += mesh.sub_meshes[gltf_primitive_index].vertex_count;
             }
+            renderer.vertex_offset += mesh.sub_meshes[gltf_primitive_index].vertex_count;
 
             if gltf_primitive.indices != -1 {
                 gltf_accessor := gltf_model.accessors[gltf_primitive.indices];
@@ -369,6 +381,89 @@ load_gltf_file :: (path: string, renderer: *Renderer.Renderer) {
 
             array_add(*renderer.meshes, mesh);
             array_add(*mesh_ids, xx renderer.meshes.count);
+        }
+    }
+
+    {
+        gltf_scene := gltf_model.scenes[
+            ifx gltf_model.default_scene != -1
+                then gltf_model.default_scene
+                else 0
+        ];
+
+        last_root_node_id: s32;
+
+        import_node :: (
+            gltf_model:      TG.Model,
+            gltf_node_index: s32,
+            parent_id:       s32,
+            prev_sibling_id: s32,
+            mesh_ids:        []u32,
+            nodes:           *[..]Renderer.Node,
+        ) -> s32 {
+            gltf_node := gltf_model.nodes[gltf_node_index];
+
+            node: Renderer.Node;
+            array_add(nodes, node);
+
+            node.parent_id = xx parent_id;
+            node_id := nodes.count;
+
+            if gltf_node.has_matrix {
+                for component: gltf_node.matrix {
+                    node.transform.floats[it_index] = xx component;
+                }
+                node.dirty = false;
+            } else {
+                for component: gltf_node.translation {
+                    node.translation.component[it_index] = xx component;
+                }
+                for component: gltf_node.scale {
+                    node.scale.component[it_index] = xx component;
+                }
+                for component: gltf_node.rotation {
+                    node.rotation.component[it_index] = xx component;
+                }
+
+                Renderer.make_transformation_matrix(*node);
+            }
+
+            if gltf_node.mesh != -1 {
+                node.mesh_id = mesh_ids[gltf_node.mesh];
+            }
+
+            if prev_sibling_id {
+                nodes.*[prev_sibling_id - 1].next_sibling_id = xx node_id;
+            }
+
+            last_child_id: s32;
+            if gltf_node.children_count > 0 {
+                for gltf_child_node_id: 0 .. gltf_node.children_count - 1 {
+                    child_index := gltf_node.children[gltf_child_node_id];
+                    last_child_id = import_node(gltf_model, child_index, xx node_id, xx last_child_id, mesh_ids, nodes);
+
+                    if (!node.first_child_id) {
+                        node.first_child_id = xx last_child_id;
+                    }
+                }
+            }
+
+            nodes.*[node_id - 1] = node;
+
+            return xx node_id;
+        }
+
+        for gltf_node_index: 0 .. gltf_scene.nodes_count - 1 {
+            node_id := import_node(
+                gltf_model,
+                gltf_node_index = gltf_scene.nodes[gltf_node_index],
+                parent_id       = 0,
+                mesh_ids        = mesh_ids,
+                prev_sibling_id = last_root_node_id,
+                nodes           = nodes,
+            );
+
+            last_root_node_id = node_id;
         }
     }
 }
