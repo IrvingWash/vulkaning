@@ -5,6 +5,8 @@
     TEMP_ALLOCATOR_OVERWRITE_MEMORY = DEBUG,
 );
 
+#import "Math";
+
 SDL :: #import "SDL3";
 Renderer :: #import,dir "Renderer"()(
     Window_Type = *SDL.Window,
@@ -86,6 +88,7 @@ load_gltf_file :: (path: string, renderer: *Renderer.Renderer) {
     }
 
     image_ids: [..]u32;
+    defer array_free(image_ids);
     {
         String :: #import "String";
         #import "stb_image";
@@ -118,6 +121,7 @@ load_gltf_file :: (path: string, renderer: *Renderer.Renderer) {
     }
 
     sampler_ids: [..]u32;
+    defer array_free(sampler_ids);
     {
         samplers_params: [..]Renderer.Create_Sampler_Params;
         samplers_params.allocator = temp;
@@ -203,7 +207,170 @@ load_gltf_file :: (path: string, renderer: *Renderer.Renderer) {
         sampler_ids = Renderer.create_samplers(renderer, samplers_params);
     }
 
-    // @Todo
+    texture_ids: [..]u32;
+    texture_ids.allocator = temp;
+    for 0 .. gltf_model.textures_count - 1 {
+        gltf_texture := gltf_model.textures[it];
+
+        id := Renderer.add_texture(
+            renderer,
+            {
+                image_id   = image_ids[gltf_texture.source],
+                sampler_id = sampler_ids[gltf_texture.sampler],
+            },
+        );
+
+        array_add(*texture_ids, id);
+    }
+
+    material_ids: [..]u32;
+    material_ids.allocator = temp;
+    for 0 .. gltf_model.materials_count - 1 {
+        gltf_material := gltf_model.materials[it];
+
+        id := Renderer.add_material(
+            renderer,
+            {
+                base_color = {
+                    xx gltf_material.pbr_metallic_roughness.base_color_factor[0],
+                    xx gltf_material.pbr_metallic_roughness.base_color_factor[1],
+                    xx gltf_material.pbr_metallic_roughness.base_color_factor[2],
+                    xx gltf_material.pbr_metallic_roughness.base_color_factor[3],
+                },
+                texture_id = ifx gltf_material.pbr_metallic_roughness.base_color_texture.index == -1
+                    then 0
+                    else texture_ids[gltf_material.pbr_metallic_roughness.base_color_texture.index] - 1,
+            }
+        );
+
+        array_add(*material_ids, id);
+    }
+
+    mesh_ids: [..]u32;
+    mesh_ids.allocator = temp;
+    for gltf_mesh_index: 0 .. gltf_model.meshes_count - 1 {
+        gltf_mesh := gltf_model.meshes[gltf_mesh_index];
+
+        mesh: Renderer.Mesh;
+        if !gltf_mesh.name.data {
+            mesh.name = copy_string({
+                gltf_mesh.name.len,
+                gltf_mesh.name.data,
+            });
+        }
+
+        array_resize(*mesh.sub_meshes, gltf_mesh.primitives_count);
+        for gltf_primitive_index: 0 .. gltf_mesh.primitives_count - 1 {
+            gltf_primitive := gltf_mesh.primitives[gltf_primitive_index];
+
+            mesh.sub_meshes[gltf_primitive_index].material_id = material_ids[gltf_primitive.material];
+            mesh.sub_meshes[gltf_primitive_index].vertex_start = xx renderer.vertex_offset;
+
+            for gltf_attribute_index: 0 .. gltf_primitive.attributes_count - 1 {
+                gltf_attribute := gltf_primitive.attributes[gltf_attribute_index];
+
+                gltf_accessor := gltf_model.accessors[gltf_attribute.value];
+
+                if string.{gltf_attribute.key.len, gltf_attribute.key.data} == {
+                    case "POSITION";
+                        assert(gltf_accessor.type == xx TG._Type.VEC3 && gltf_accessor.component_type == xx TG.Component_Type.FLOAT);
+
+                        mesh.sub_meshes[gltf_primitive_index].vertex_count = gltf_accessor.count;
+
+                        gltf_buffer_view := gltf_model.buffer_views[gltf_accessor.buffer_view];
+                        gltf_buffer := gltf_model.buffers[gltf_buffer_view.buffer];
+                        buffer_offset := gltf_buffer_view.byte_offset + gltf_accessor.byte_offset;
+                        stride := ifx gltf_buffer_view.byte_stride != 0
+                            then gltf_buffer_view.byte_stride
+                            else size_of(Vector3);
+
+                        for gltf_accessor_index: 0 .. gltf_accessor.count - 1 {
+                            element_offset := buffer_offset + gltf_accessor_index * stride;
+                            data: *float = cast(*float, gltf_buffer.data.data + element_offset);
+
+                            renderer.vertices[renderer.vertex_offset + gltf_accessor_index].position = { data[0], data[1], data[3] };
+                        }
+                    case "NORMAL";
+                        assert(gltf_accessor.type == xx TG._Type.VEC3 && gltf_accessor.component_type == xx TG.Component_Type.FLOAT);
+
+                        gltf_buffer_view := gltf_model.buffer_views[gltf_accessor.buffer_view];
+                        gltf_buffer := gltf_model.buffers[gltf_buffer_view.buffer];
+                        buffer_offset := gltf_buffer_view.byte_offset + gltf_accessor.byte_offset;
+                        stride := ifx gltf_buffer_view.byte_stride != 0
+                            then gltf_buffer_view.byte_stride
+                            else size_of(Vector3);
+
+                        for gltf_accessor_index: 0 .. gltf_accessor.count - 1 {
+                            element_offset := buffer_offset + gltf_accessor_index * stride;
+                            data: *float = cast(*float, gltf_buffer.data.data + element_offset);
+
+                            renderer.vertices[renderer.vertex_offset + gltf_accessor_index].normal = { data[0], data[1], data[3] };
+                        }
+                    case "COLOR_0";
+                        assert(gltf_accessor.type == xx TG._Type.VEC3 || gltf_accessor.type == xx TG._Type.VEC4);
+                        assert(gltf_accessor.component_type == xx TG.Component_Type.FLOAT);
+
+                        gltf_buffer_view := gltf_model.buffer_views[gltf_accessor.buffer_view];
+                        gltf_buffer := gltf_model.buffers[gltf_buffer_view.buffer];
+                        buffer_offset := gltf_buffer_view.byte_offset + gltf_accessor.byte_offset;
+                        stride := ifx gltf_buffer_view.byte_stride != 0
+                            then gltf_buffer_view.byte_stride
+                            else size_of(Vector3);
+
+                        for gltf_accessor_index: 0 .. gltf_accessor.count - 1 {
+                            element_offset := buffer_offset + gltf_accessor_index * stride;
+                            data: *float = cast(*float, gltf_buffer.data.data + element_offset);
+
+                            renderer.vertices[renderer.vertex_offset + gltf_accessor_index].color = { data[0], data[1], data[3] };
+                        }
+                    case "TEXCOORD_0";
+                        assert(gltf_accessor.type == xx TG._Type.VEC2 && gltf_accessor.component_type == xx TG.Component_Type.FLOAT);
+
+                        gltf_buffer_view := gltf_model.buffer_views[gltf_accessor.buffer_view];
+                        gltf_buffer := gltf_model.buffers[gltf_buffer_view.buffer];
+                        buffer_offset := gltf_buffer_view.byte_offset + gltf_accessor.byte_offset;
+                        stride := ifx gltf_buffer_view.byte_stride != 0
+                            then gltf_buffer_view.byte_stride
+                            else size_of(Vector3);
+
+                        for gltf_accessor_index: 0 .. gltf_accessor.count - 1 {
+                            element_offset := buffer_offset + gltf_accessor_index * stride;
+                            data: *float = cast(*float, gltf_buffer.data.data + element_offset);
+
+                            renderer.vertices[renderer.vertex_offset + gltf_accessor_index].uv = { data[0], data[1] };
+                        }
+                }
+
+                renderer.vertex_offset += mesh.sub_meshes[gltf_primitive_index].vertex_count;
+            }
+
+            if gltf_primitive.indices != -1 {
+                gltf_accessor := gltf_model.accessors[gltf_primitive.indices];
+                gltf_buffer_view := gltf_model.buffer_views[gltf_accessor.buffer_view];
+                gltf_buffer := gltf_model.buffers[gltf_buffer_view.buffer];
+
+                mesh.sub_meshes[gltf_primitive_index].index_start = renderer.index_offset;
+                mesh.sub_meshes[gltf_primitive_index].index_count = gltf_accessor.count;
+
+                if gltf_accessor.component_type == {
+                    case xx TG.Component_Type.UNSIGNED_INT;
+                        data: *u32 = cast(*u32, gltf_buffer.data.data + gltf_buffer_view.byte_offset + gltf_accessor.byte_offset);
+                        memcpy(*renderer.indices[renderer.index_offset], data, xx gltf_accessor.count * size_of(u32));
+                    case xx TG.Component_Type.UNSIGNED_SHORT;
+                        data: *u16 = cast(*u16, gltf_buffer.data.data + gltf_buffer_view.byte_offset + gltf_accessor.byte_offset);
+
+                        for id: 0 .. gltf_accessor.count - 1 {
+                            renderer.indices[renderer.index_offset + id] = cast(u32, data[id]);
+                        }
+                }
+
+                renderer.index_offset += mesh.sub_meshes[gltf_primitive_index].index_count;
+            }
+
+            array_add(*renderer.meshes, mesh);
+            array_add(*mesh_ids, xx renderer.meshes.count);
+        }
+    }
 }
 
 process_input :: (state: *State) {

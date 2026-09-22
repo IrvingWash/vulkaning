@@ -44,6 +44,15 @@ Renderer :: struct {
 
     gpu_images: [..]GPU_Image;
     samplers:   [..]VK.Sampler;
+    textures:   [..]Texture;
+    materials:  [..]Material;
+
+    vertices: [..]Vertex;
+    indices:  [..]u32;
+    vertex_offset: u64;
+    index_offset:  u64;
+
+    meshes: [..]Mesh;
 }
 
 Create_Sampler_Params :: #type VK.Sampler_Create_Info;
@@ -152,11 +161,23 @@ init :: (
     );
     renderer.white_pixel_texture.sampler_id = xx renderer.samplers.count;
 
+    VERTEX_BUFFER_SIZE :: 64 * 1024 * 1024;
+    INDEX_BUFFER_SIZE  :: 32 * 1024 * 1024;
+
+    array_resize(*renderer.vertices, VERTEX_BUFFER_SIZE / size_of(Vertex));
+    array_resize(*renderer.indices, INDEX_BUFFER_SIZE / size_of(u32));
+
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
     VK.device_wait_idle(renderer.device);
+
+    array_free(renderer.meshes);
+    array_free(renderer.indices);
+    array_free(renderer.vertices);
+    array_free(renderer.materials);
+    array_free(renderer.textures);
 
     for sampler: renderer.samplers {
         VK.destroy_sampler(renderer.device, sampler);
@@ -191,6 +212,18 @@ deinit :: (renderer: *Renderer) {
     VK.destroy_instance(renderer.instance);
 
     renderer.* = {};
+}
+
+add_texture :: (renderer: *Renderer, texture: Texture) -> id: u32 {
+    array_add(*renderer.textures, texture);
+
+    return xx renderer.textures.count;
+}
+
+add_material :: (renderer: *Renderer, material: Material) -> id: u32 {
+    array_add(*renderer.materials, material);
+
+    return xx renderer.materials.count;
 }
 
 create_samplers :: (renderer: *Renderer, params_list: []Create_Sampler_Params) -> sampler_ids: [..]u32 {

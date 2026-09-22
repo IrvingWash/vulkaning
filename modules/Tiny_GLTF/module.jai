@@ -651,6 +651,29 @@ Texture_Wrap :: enum {
     MIRRORED_REPEAT :: 33648;
 }
 
+_Type :: enum {
+    VEC2   :: 2;
+    VEC3   :: 3;
+    VEC4   :: 4;
+    MAT2   :: 32 + 2;
+    MAT3   :: 32 + 3;
+    MAT4   :: 32 + 4;
+    SCALAR :: 64 + 1;
+    VECTOR :: 64 + 4;
+    MATRIX :: 64 + 16;
+}
+
+Component_Type :: enum {
+    BYTE           :: 5120;
+    UNSIGNED_BYTE  :: 5121;
+    SHORT          :: 5122;
+    UNSIGNED_SHORT :: 5123;
+    INT            :: 5124;
+    UNSIGNED_INT   :: 5125;
+    FLOAT          :: 5126;
+    DOUBLE         :: 5130;
+}
+
 parse_options_init :: (options: *Parse_Options) -> void #foreign tinygltf "tg3_parse_options_init";
 
 error_stack_init :: (es: *Error_Stack) -> void #foreign tinygltf "tg3_error_stack_init";

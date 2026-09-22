@@ -1,16 +1,29 @@
-Model :: struct {
-    vertices: [..]Vertex;
-    indices:  [..]u32;
-    textures: [..]Texture;
+Node :: struct {
+    translation: Vector3;
+    scale:       Vector3 = { 1, 1, 1 };
+    roation:     Quaternion;
+    transform:   Matrix4 = Matrix4_Identity;
 
-    allocator: Allocator;
+    mesh_id:         u32;
+    parend_id:       u32;
+    next_sibling_id: u32;
+    first_child_id:  u32;
+
+    dirty: bool = true;
 }
 
-Vertex :: struct {
-    position: Vector3;
-    color:    Vector3;
-    normal:   Vector3;
-    uv:       Vector2;
+Mesh :: struct {
+    name:       string;
+    sub_meshes: [..]Sub_Mesh;
+}
+
+Sub_Mesh :: struct {
+    vertex_start: u64;
+    vertex_count: u64;
+    index_start:  u64;
+    index_count:  u64;
+
+    material_id: u32;
 }
 
 Image :: struct {
@@ -23,4 +36,29 @@ Image :: struct {
 Texture :: struct {
     image_id:   u32;
     sampler_id: u32;
+}
+
+Material :: struct {
+    base_color: Vector4 = { 1, 1, 1, 1 };
+    texture_id: u32;
+}
+
+Vertex :: struct {
+    position: Vector3;
+    color:    Vector3 = { 1, 1, 1 };
+    normal:   Vector3;
+    uv:       Vector2;
+}
+
+make_transformation_matrix :: (node: *Node) {
+    if !node.dirty {
+        return node.transform;
+    }
+
+    translation := make_translation_matrix4(node.translation);
+    rotation    := rotation_matrix(Matrix4, node.rotation);
+    scaling     := make_scale_matrix4(node.scale);
+
+    node.trasnform = translation * rotation * scaling;
+    node.dirty = false;
 }
