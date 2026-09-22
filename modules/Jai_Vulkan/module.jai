@@ -20,6 +20,7 @@ Command_Buffer        :: #type *Command_Buffer_T;
 Fence                 :: #type *Fence_T;
 Framebuffer           :: #type *Framebuffer_T;
 Buffer                :: #type *Buffer_T;
+Sampler               :: #type *Sampler_T;
 
 Bool :: #type,isa u32;
 TRUE:  Bool : 1;
@@ -127,14 +128,14 @@ Debug_Utils_Object_Name_Info_Ext :: struct {
     object_type: Object_Type;
     object_handle: u64;
     p_object_name: *u8;
-};
+}
 
 Debug_Utils_Label_Ext :: struct {
     s_type        := Structure_Type.DEBUG_UTILS_LABEL_EXT;
     p_next:       *void;
     p_label_name: *u8;
     color:        [4]float;
-};
+}
 
 Instance_Create_Info :: struct {
     s_type :=                   Structure_Type.INSTANCE_CREATE_INFO;
@@ -326,7 +327,7 @@ Physical_Device_Vulkan_1_4_Features :: struct {
     pipeline_robustness:                         Bool;
     host_image_copy:                             Bool;
     push_descriptor:                             Bool;
-};
+}
 
 Physical_Device_Vulkan_1_3_Features :: struct {
     s_type                                                     := Structure_Type.PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
@@ -841,7 +842,7 @@ Semaphore_Wait_Info :: struct {
     semaphore_count: u32;
     p_semaphores: *Semaphore;
     p_values: *u64;
-};
+}
 
 Command_Buffer_Begin_Info :: struct {
     s_type              := Structure_Type.COMMAND_BUFFER_BEGIN_INFO;
@@ -1001,7 +1002,7 @@ Buffer_Create_Info :: struct {
     sharing_mode:             Sharing_Mode;
     queue_family_index_count: u32;
     p_queue_family_indices:   *u32;
-};
+}
 
 Buffer_Image_Copy :: struct {
     buffer_offset: Device_Size;
@@ -1010,7 +1011,7 @@ Buffer_Image_Copy :: struct {
     image_subresource: Image_Subresource_Layers;
     image_offset: Offset_3D;
     image_extent: Extent_3D;
-};
+}
 
 Image_Subresource_Layers :: struct {
     aspect_mask:      Image_Aspect_Flags;
@@ -1029,7 +1030,28 @@ Submit_Info :: struct {
     p_command_buffers:      *Command_Buffer;
     signal_semaphore_count: u32;
     p_signal_semaphoers:    *Semaphore;
-};
+}
+
+Sampler_Create_Info :: struct {
+    s_type                    := Structure_Type.SAMPLER_CREATE_INFO;
+    p_next:                   *void;
+    flags:                    Sampler_Create_Flags;
+    mag_filter:               Filter;
+    min_filter:               Filter;
+    mipmap_mode:              Sampler_Mipmap_Mode;
+    address_mode_u:           Sampler_Address_Mode;
+    address_mode_v:           Sampler_Address_Mode;
+    address_mode_w:           Sampler_Address_Mode;
+    mip_lod_bias:             float;
+    anisotropy_enable:        Bool;
+    max_anisotropy:           float;
+    compare_enable:           Bool;
+    compare_op:               Compare_Op;
+    min_lod:                  float;
+    max_lod:                  float;
+    border_color:             Border_Color;
+    unnormalized_coordinates: Bool;
+}
 
 Dependency_Flags :: enum_flags u32 {
     BY_REGION                                          :: 1;
@@ -1088,7 +1110,7 @@ Debug_Utils_Message_Severity_Flags_Ext :: enum_flags u32 {
     ERROR_EXT   :: 0x00001000;
 }
 
-Debug_Utils_Messenger_Callback_Data_Flags_Ext :: enum_flags u32 {};
+Debug_Utils_Messenger_Callback_Data_Flags_Ext :: enum_flags u32 {}
 
 Instance_Create_Flags :: enum_flags u32 {
     ENUMERATE_PORTABILITY_KHR     :: 1;
@@ -1365,11 +1387,11 @@ Pipeline_Create_Flags :: enum_flags u32 {
 Semaphore_Wait_Flags :: enum_flags u32 {
     ANY     :: 0x00000001;
     ANY_KHR :: ANY;
-};
+}
 
 Command_Pool_Reset_Flags :: enum_flags u32 {
     RELEASE_RESOURCES :: 0x00000001;
-};
+}
 
 Command_Buffer_Usage_Flags :: enum_flags u32 {
     ONE_TIME_SUBMIT      :: 1;
@@ -1612,7 +1634,7 @@ Resolve_Mode_Flags :: enum_flags u32 {
     MINKHR                             :: MIN;
     MAXKHR                             :: MAX;
     EXTERNAL_FORMAT_DOWNSAMPLE_ANDROID :: EXTERNAL_FORMAT_DOWNSAMPLEANDROID;
-};
+}
 
 Rendering_Flags :: enum_flags u32 {
     CONTENTS_SECONDARY_COMMAND_BUFFERS       :: 1;
@@ -1672,7 +1694,7 @@ Pipeline_Stage_Flags :: enum_flags u32 {
 Submit_Flags :: enum_flags u32 {
     PROTECTED     :: 0x00000001;
     PROTECTED_KHR :: PROTECTED;
-};
+}
 
 Buffer_Usage_Flags :: enum_flags u32 {
     TRANSFER_SRC                                    :: 0x00000001;
@@ -1718,6 +1740,14 @@ Buffer_Create_Flags :: enum_flags u32 {
     VIDEO_PROFILE_INDEPENDENT_BIT_KHR        :: 0x00000040;
     DEVICE_ADDRESS_CAPTURE_REPLAY_BIT_EXT    :: DEVICE_ADDRESS_CAPTURE_REPLAY_BIT;
     DEVICE_ADDRESS_CAPTURE_REPLAY_BIT_KHR    :: DEVICE_ADDRESS_CAPTURE_REPLAY_BIT;
+}
+
+Sampler_Create_Flags :: enum_flags u32 {
+    SUBSAMPLED_EXT                       :: 0x00000001;
+    SUBSAMPLED_COARSE_RECONSTRUCTION_EXT :: 0x00000002;
+    DESCRIPTOR_BUFFER_CAPTURE_REPLAY_EXT :: 0x00000008;
+    NON_SEAMLESS_CUBE_MAP_EXT            :: 0x00000004;
+    IMAGE_PROCESSING_QCOM                :: 0x00000010;
 }
 
 Structure_Type :: enum u32 {
@@ -4103,6 +4133,38 @@ Pipeline_Bind_Point :: enum u32 {
     MAX_ENUM               :: 2147483647;
 }
 
+Sampler_Mipmap_Mode :: enum u32 {
+    NEAREST :: 0;
+    LINEAR  :: 1;
+}
+
+Sampler_Address_Mode :: enum u32 {
+    REPEAT                   :: 0;
+    MIRRORED_REPEAT          :: 1;
+    CLAMP_TO_EDGE            :: 2;
+    CLAMP_TO_BORDER          :: 3;
+    MIRROR_CLAMP_TO_EDGE     :: 4;
+    MIRROR_CLAMP_TO_EDGE_KHR :: MIRROR_CLAMP_TO_EDGE;
+}
+
+Filter :: enum u32 {
+    NEAREST   :: 0;
+    LINEAR    :: 1;
+    CUBIC_EXT :: 1000015000;
+    CUBIC_IMG :: CUBIC_EXT;
+}
+
+Border_Color :: enum u32 {
+    FLOAT_TRANSPARENT_BLACK :: 0;
+    INT_TRANSPARENT_BLACK   :: 1;
+    FLOAT_OPAQUE_BLACK      :: 2;
+    INT_OPAQUE_BLACK        :: 3;
+    FLOAT_OPAQUE_WHITE      :: 4;
+    INT_OPAQUE_WHITE        :: 5;
+    FLOAT_CUSTOM_EXT        :: 1000287003;
+    INT_CUSTOM_EXT          :: 1000287004;
+}
+
 make_version :: (major: u32, minor: u32, patch: u32) -> u32 {
     return (major << 22) | (minor << 12) | patch;
 }
@@ -4621,6 +4683,24 @@ free_command_buffers :: inline (
     vkFreeCommandBuffers(device, command_pool, xx command_buffers.count, command_buffers.data);
 }
 
+create_sampler :: inline (
+    device: Device,
+    p_create_info: *Sampler_Create_Info,
+    p_allocator: *Allocation_Callbacks = null,
+) -> Result, Sampler {
+    sampler: Sampler;
+
+    result := vkCreateSampler(device, p_create_info, p_allocator, *sampler);
+
+    return result, sampler;
+}
+
+destroy_sampler :: (
+    device:      Device,
+    sampler:     Sampler,
+    p_allocator: *Allocation_Callbacks = null,
+) -> void #foreign libvulkan "vkDestroySampler";
+
 
 
 #scope_file
@@ -4647,6 +4727,7 @@ Command_Buffer_T        :: struct {}
 Fence_T                 :: struct {}
 Framebuffer_T           :: struct {}
 Buffer_T                :: struct {}
+Sampler_T               :: struct {}
 
 vkCreateInstance :: (
     p_create_info: *Instance_Create_Info,
@@ -4813,6 +4894,13 @@ vkFreeCommandBuffers :: (
     command_buffer_count: u32,
     p_command_buffers:    *Command_Buffer,
 ) -> void #foreign libvulkan;
+
+vkCreateSampler :: (
+    device:        Device,
+    p_create_info: *Sampler_Create_Info,
+    p_allocator:   *Allocation_Callbacks,
+    p_sampler:     *Sampler,
+) -> Result #foreign libvulkan;
 
 #if OS == {
     case .LINUX;

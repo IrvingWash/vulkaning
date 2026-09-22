@@ -41,6 +41,7 @@ Renderer :: struct {
     next_signal_value:         u64 = MAX_FRAMES_IN_FLIGHT_COUNT + 1; // I guess this is because we initialize the timeline_semaphore with MAX_FRAMES_IN_FLIGHT_COUNT
 
     white_pixel_image: GPU_Image;
+    fallback_sampler:  VK.Sampler;
 }
 
 Swapchain_Info :: struct {
@@ -127,12 +128,15 @@ init :: (
         renderer.transient_command_pool,
     );
 
+    renderer.fallback_sampler = create_fallback_sampler(renderer.device);
+
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
     VK.device_wait_idle(renderer.device);
 
+    VK.destroy_sampler(renderer.device, renderer.fallback_sampler);
     destroy_white_pixel_image(renderer.device, renderer.allocator, renderer.white_pixel_image);
 
     VK.destroy_command_pool(renderer.device, renderer.transient_command_pool);
@@ -416,6 +420,22 @@ MAX_FRAMES_IN_FLIGHT_COUNT :: 2;
 
 ASSERT_SUCCESS :: (name: string) #expand {
     assert(`result == .SUCCESS, name);
+}
+
+create_fallback_sampler :: (device: VK.Device) -> VK.Sampler {
+    sampler_create_info := VK.Sampler_Create_Info.{
+        mag_filter     = .NEAREST,
+        min_filter     = .NEAREST,
+        address_mode_u = .REPEAT,
+        address_mode_v = .REPEAT,
+        address_mode_w = .REPEAT,
+        compare_enable = VK.FALSE,
+    };
+
+    result, sampler := VK.create_sampler(device, *sampler_create_info);
+    ASSERT_SUCCESS("Create fallback sampler");
+
+    return sampler;
 }
 
 destroy_white_pixel_image :: (device: VK.Device, allocator: VMA.Allocator, white_pixel_image: GPU_Image) {
