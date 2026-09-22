@@ -39,6 +39,8 @@ Renderer :: struct {
     should_recreate_swapchain: bool;
     frame_index:               u64;
     next_signal_value:         u64 = MAX_FRAMES_IN_FLIGHT_COUNT + 1; // I guess this is because we initialize the timeline_semaphore with MAX_FRAMES_IN_FLIGHT_COUNT
+
+    white_pixel_image: GPU_Image;
 }
 
 Swapchain_Info :: struct {
@@ -118,13 +120,20 @@ init :: (
 
     renderer.transient_command_pool = create_transient_command_pool(renderer.device, renderer.graphics_qfi);
 
-    create_white_pixel_image(renderer.allocator, renderer.device, renderer.transient_command_pool);
+    renderer.white_pixel_image = create_white_pixel_image(
+        renderer.graphics_queue,
+        renderer.allocator,
+        renderer.device,
+        renderer.transient_command_pool,
+    );
 
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
     VK.device_wait_idle(renderer.device);
+
+    destroy_white_pixel_image(renderer.device, renderer.allocator, renderer.white_pixel_image);
 
     VK.destroy_command_pool(renderer.device, renderer.transient_command_pool);
 
@@ -409,7 +418,18 @@ ASSERT_SUCCESS :: (name: string) #expand {
     assert(`result == .SUCCESS, name);
 }
 
-create_white_pixel_image :: (allocator: VMA.Allocator, device: VK.Device, command_pool: VK.Command_Pool) {
+destroy_white_pixel_image :: (device: VK.Device, allocator: VMA.Allocator, white_pixel_image: GPU_Image) {
+    VK.destroy_image_view(device, white_pixel_image.image_view);
+
+    VMA.destroy_image(allocator, white_pixel_image.image, white_pixel_image.allocation);
+}
+
+create_white_pixel_image :: (
+    queue:        VK.Queue,
+    allocator:    VMA.Allocator,
+    device:       VK.Device,
+    command_pool: VK.Command_Pool,
+) -> GPU_Image {
     white: u32 = 0xFFFFFFFF;
 
     white_pixel := Image.{
@@ -421,12 +441,42 @@ create_white_pixel_image :: (allocator: VMA.Allocator, device: VK.Device, comman
 
     command_buffer := start_transient_command_buffer(device, command_pool);
 
-    create_gpu_image(device, allocator, command_buffer, white_pixel);
+    gpu_image, staging_buffer := create_gpu_image(device, allocator, command_buffer, white_pixel);
+    defer VMA.destroy_buffer(allocator, staging_buffer.buffer, staging_buffer.allocation);
 
-    // @Todo
+    submit_transient_command_buffer(device, command_pool, queue, command_buffer);
+
+    return gpu_image;
 }
 
-create_gpu_image :: (device: VK.Device, allocator: VMA.Allocator, command_buffer: VK.Command_Buffer, image: Image) {
+submit_transient_command_buffer :: (
+    device: VK.Device,
+    command_pool: VK.Command_Pool,
+    queue: VK.Queue,
+    command_buffer: VK.Command_Buffer,
+) {
+    VK.end_command_buffer(command_buffer);
+
+    submit_info := VK.Submit_Info.{
+        command_buffer_count = 1,
+        p_command_buffers    = *command_buffer,
+    };
+
+    result := VK.queue_submit(queue, .[submit_info], null);
+    ASSERT_SUCCESS("Submit transient command buffer");
+
+    result = VK.queue_wait_idle(queue);
+    ASSERT_SUCCESS("Submit transient command buffer wait");
+
+    VK.free_command_buffers(device, command_pool, .[command_buffer]);
+};
+
+create_gpu_image :: (
+    device: VK.Device,
+    allocator: VMA.Allocator,
+    command_buffer: VK.Command_Buffer,
+    image: Image,
+) -> GPU_Image, GPU_Buffer {
     gpu_image: GPU_Image = ---;
 
     image_create_info := VK.Image_Create_Info.{
@@ -514,7 +564,32 @@ create_gpu_image :: (device: VK.Device, allocator: VMA.Allocator, command_buffer
         *buffer_image_copy,
     );
 
-    // @Todo
+    // Transition to a layout suitable for sampling
+    shader_read_barrier := VK.Image_Memory_Barrier_2.{
+        src_stage_mask  = .COPY,
+        src_access_mask = .TRANSFER_WRITE,
+        dst_stage_mask  = .FRAGMENT_SHADER,
+        dst_access_mask = .SHADER_READ,
+        old_layout      = .TRANSFER_DST_OPTIMAL,
+        new_layout      = .SHADER_READ_ONLY_OPTIMAL,
+        image           = gpu_image.image,
+        subresource_range = {
+            aspect_mask      = .COLOR,
+            base_mip_level   = 0,
+            level_count      = 1,
+            base_array_layer = 0,
+            layer_count      = 1,
+        },
+    };
+
+    shader_read_dependency_info := VK.Dependency_Info.{
+        image_memory_barrier_count = 1,
+        p_image_memory_barriers    = *shader_read_barrier,
+    };
+
+    VK.cmd_pipeline_barrier_2(command_buffer, *shader_read_dependency_info);
+
+    return gpu_image, staging_buffer;
 }
 
 map_copy_buffer_data :: (allocator: VMA.Allocator, buffer: GPU_Buffer, buffer_offset: u64, data: *void, byte_size: int) {
@@ -977,7 +1052,8 @@ create_device :: (physical_device: VK.Physical_Device, graphics_qfi: u32) -> VK.
         assert(
             supported_features_13.dynamic_rendering
             && supported_features_13.synchronization_2
-            && supported_features_12.timeline_semaphore,
+            && supported_features_12.timeline_semaphore
+            && supported_features_12.buffer_device_address,
             "One of the required features is not supported",
         );
     }
@@ -989,8 +1065,9 @@ create_device :: (physical_device: VK.Physical_Device, graphics_qfi: u32) -> VK.
         dynamic_rendering = VK.TRUE,
     };
     desired_features_12 := VK.Physical_Device_Vulkan_1_2_Features.{
-        p_next             = *desired_features_13,
-        timeline_semaphore = VK.TRUE,
+        p_next                = *desired_features_13,
+        timeline_semaphore    = VK.TRUE,
+        buffer_device_address = VK.TRUE,
     };
     desired_features := VK.Physical_Device_Features_2.{ p_next = *desired_features_12 };
 

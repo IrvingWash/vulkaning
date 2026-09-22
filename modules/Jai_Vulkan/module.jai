@@ -1019,6 +1019,18 @@ Image_Subresource_Layers :: struct {
     layer_count:      u32;
 }
 
+Submit_Info :: struct {
+    s_type                  := Structure_Type.SUBMIT_INFO;
+    p_next:                 *void;
+    wait_semaphore_count:   u32;
+    p_wait_semaphores:      *Semaphore;
+    p_wait_dst_stage_mask:  *Pipeline_Stage_Flags;
+    command_buffer_count:   u32;
+    p_command_buffers:      *Command_Buffer;
+    signal_semaphore_count: u32;
+    p_signal_semaphoers:    *Semaphore;
+};
+
 Dependency_Flags :: enum_flags u32 {
     BY_REGION                                          :: 1;
     DEVICE_GROUP                                       :: 4;
@@ -4595,6 +4607,20 @@ cmd_copy_buffer_to_image :: (
     p_regions: *Buffer_Image_Copy,
 ) -> void #foreign libvulkan "vkCmdCopyBufferToImage";
 
+queue_submit :: inline (queue: Queue, submits: []Submit_Info, fence: Fence) -> Result {
+    return vkQueueSubmit(queue, xx submits.count, submits.data, fence);
+}
+
+queue_wait_idle :: (queue: Queue) -> Result #foreign libvulkan "vkQueueWaitIdle";
+
+free_command_buffers :: inline (
+    device:          Device,
+    command_pool:    Command_Pool,
+    command_buffers: []Command_Buffer,
+) {
+    vkFreeCommandBuffers(device, command_pool, xx command_buffers.count, command_buffers.data);
+}
+
 
 
 #scope_file
@@ -4773,6 +4799,20 @@ vkQueueSubmit2 :: (
     p_submits:    *Submit_Info_2,
     fence:        Fence,
 ) -> Result #foreign libvulkan;
+
+vkQueueSubmit :: (
+    queue:        Queue,
+    submit_count: u32,
+    p_submits:    *Submit_Info,
+    fence:        Fence,
+) -> Result #foreign libvulkan;
+
+vkFreeCommandBuffers :: (
+    device:               Device,
+    command_pool:         Command_Pool,
+    command_buffer_count: u32,
+    p_command_buffers:    *Command_Buffer,
+) -> void #foreign libvulkan;
 
 #if OS == {
     case .LINUX;

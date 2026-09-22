@@ -213,6 +213,12 @@ map_memory :: inline (allocator: Allocator, allocation: Allocation) -> Result, *
 
 unmap_memory :: (allocator: Allocator, allocation: Allocation ) -> void #foreign libvma "vmaUnmapMemory";
 
+destroy_buffer :: (
+    allocator:  Allocator,
+    buffer:     Buffer,
+    allocation: Allocation,
+) -> void #foreign libvma "vmaDestroyBuffer";
+
 
 
 #scope_file
