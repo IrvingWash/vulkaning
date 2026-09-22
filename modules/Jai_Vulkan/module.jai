@@ -26,6 +26,8 @@ Bool :: #type,isa u32;
 TRUE:  Bool : 1;
 FALSE: Bool : 0;
 
+LOD_CLAMP_NONE: float : 1000;
+
 Pfn_Debug_Utils_Messenger_Callback_Ext :: #type (
     message_severity: Debug_Utils_Message_Severity_Flags_Ext,
     message_types:    Debug_Utils_Message_Type_Flags_Ext,

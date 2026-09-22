@@ -636,6 +636,21 @@ Error_Code :: enum u32 {
     SERIALIZE_FAILED :: 81;
 }
 
+Texture_Filter :: enum {
+    NEAREST                :: 9728;
+    LINEAR                 :: 9729;
+    NEAREST_MIPMAP_NEAREST :: 9984;
+    LINEAR_MIPMAP_NEAREST  :: 9985;
+    NEAREST_MIPMAP_LINEAR  :: 9986;
+    LINEAR_MIPMAP_LINEAR   :: 9987;
+}
+
+Texture_Wrap :: enum {
+    REPEAT          :: 10497;
+    CLAMP_TO_EDGE   :: 33071;
+    MIRRORED_REPEAT :: 33648;
+}
+
 parse_options_init :: (options: *Parse_Options) -> void #foreign tinygltf "tg3_parse_options_init";
 
 error_stack_init :: (es: *Error_Stack) -> void #foreign tinygltf "tg3_error_stack_init";

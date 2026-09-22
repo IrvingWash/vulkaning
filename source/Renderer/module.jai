@@ -46,6 +46,8 @@ Renderer :: struct {
     samplers:   [..]VK.Sampler;
 }
 
+Create_Sampler_Params :: #type VK.Sampler_Create_Info;
+
 Swapchain_Info :: struct {
     swapchain:   VK.Swapchain_Khr;
     config:      VK.Swapchain_Create_Info_Khr;
@@ -136,7 +138,17 @@ init :: (
 
     array_add(
         *renderer.samplers,
-        create_white_pixel_sampler(renderer.device),
+        create_sampler(
+            renderer.device,
+            {
+                mag_filter     = .NEAREST,
+                min_filter     = .NEAREST,
+                address_mode_u = .REPEAT,
+                address_mode_v = .REPEAT,
+                address_mode_w = .REPEAT,
+                compare_enable = VK.FALSE,
+            },
+        ),
     );
     renderer.white_pixel_texture.sampler_id = xx renderer.samplers.count;
 
@@ -179,6 +191,51 @@ deinit :: (renderer: *Renderer) {
     VK.destroy_instance(renderer.instance);
 
     renderer.* = {};
+}
+
+create_samplers :: (renderer: *Renderer, params_list: []Create_Sampler_Params) -> sampler_ids: [..]u32 {
+    sampler_ids: [..]u32;
+
+    for params: params_list {
+        sampler := create_sampler(renderer.device, params);
+
+        array_add(*renderer.samplers, sampler);
+
+        array_add(*sampler_ids, xx renderer.samplers.count);
+    }
+
+    return sampler_ids;
+}
+
+upload_images :: (renderer: *Renderer, images: []Image) -> image_ids: [..]u32 {
+    command_buffer := start_transient_command_buffer(renderer.device, renderer.transient_command_pool);
+
+    staging_buffers: [..]GPU_Buffer;
+    staging_buffers.allocator = temp;
+    array_resize(*staging_buffers, images.count);
+    defer for buffer: staging_buffers {
+        VMA.destroy_buffer(renderer.allocator, buffer.buffer, buffer.allocation);
+    }
+
+    gpu_image_ids: [..]u32;
+    array_resize(*gpu_image_ids, images.count);
+
+    for image: images {
+        gpu_image, buffer := create_gpu_image(renderer.device, renderer.allocator, command_buffer, image);
+
+        array_add(*renderer.gpu_images, gpu_image);
+        array_add(*staging_buffers, buffer);
+        array_add(*gpu_image_ids, xx renderer.gpu_images.count);
+    }
+
+    submit_transient_command_buffer(
+        renderer.device,
+        renderer.transient_command_pool,
+        renderer.graphics_queue,
+        command_buffer,
+    );
+
+    return gpu_image_ids;
 }
 
 render :: (renderer: *Renderer) {
@@ -439,16 +496,7 @@ ASSERT_SUCCESS :: (name: string) #expand {
     assert(`result == .SUCCESS, name);
 }
 
-create_white_pixel_sampler :: (device: VK.Device) -> VK.Sampler {
-    sampler_create_info := VK.Sampler_Create_Info.{
-        mag_filter     = .NEAREST,
-        min_filter     = .NEAREST,
-        address_mode_u = .REPEAT,
-        address_mode_v = .REPEAT,
-        address_mode_w = .REPEAT,
-        compare_enable = VK.FALSE,
-    };
-
+create_sampler :: (device: VK.Device, sampler_create_info: VK.Sampler_Create_Info) -> VK.Sampler {
     result, sampler := VK.create_sampler(device, *sampler_create_info);
     ASSERT_SUCCESS("Create white pixel sampler");
 

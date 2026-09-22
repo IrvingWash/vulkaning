@@ -1,6 +1,7 @@
 Model :: struct {
     vertices: [..]Vertex;
     indices:  [..]u32;
+    textures: [..]Texture;
 
     allocator: Allocator;
 }
