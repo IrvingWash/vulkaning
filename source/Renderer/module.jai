@@ -55,8 +55,9 @@ Renderer :: struct {
     meshes: [..]Mesh;
 
     buffers: [..]GPU_Buffer;
-    vertex_buffer_id: int;
-    index_buffer_id:  int;
+    vertex_buffer_id:   int;
+    index_buffer_id:    int;
+    material_buffer_id: int;
 
     global_descriptor_pool:       VK.Descriptor_Pool;
     global_descriptor_set_layout: VK.Descriptor_Set_Layout;
@@ -85,6 +86,12 @@ Frame_Resources :: struct {
     command_pool:             VK.Command_Pool;
     command_buffer:           VK.Command_Buffer;
     image_acquired_semaphore: VK.Semaphore;
+}
+
+Frame_Constants :: struct {
+    vertex_buffer_address:   u64;
+    material_buffer_address: u64;
+    render_items_address:    u64;
 }
 
 GPU_Image :: struct {
@@ -137,7 +144,11 @@ init :: (
 
     renderer.depth_image = create_depth_image(renderer.device, renderer.swapchain_info.config.image_extent, renderer.allocator);
 
-    renderer.graphics_pipeline_info = create_graphics_pipeline(renderer.device);
+    renderer.global_descriptor_pool,
+        renderer.global_descriptor_set_layout,
+        renderer.global_descriptor_set = create_descriptor_sets(renderer.device);
+
+    renderer.graphics_pipeline_info = create_graphics_pipeline(renderer.device, renderer.global_descriptor_set_layout);
 
     renderer.timeline_semaphore = create_timeline_semaphore(renderer.device);
     renderer.frame_resources_list = create_frame_resources(renderer.device, renderer.graphics_qfi);
@@ -173,10 +184,6 @@ init :: (
 
     array_resize(*renderer.vertices, VERTEX_BUFFER_SIZE / size_of(Vertex));
     array_resize(*renderer.indices, INDEX_BUFFER_SIZE / size_of(u32));
-
-    renderer.global_descriptor_pool,
-        renderer.global_descriptor_set_layout,
-        renderer.global_descriptor_set = create_descriptor_sets(renderer.device);
 
     return renderer;
 }
@@ -374,6 +381,18 @@ start_rendering :: (renderer: *Renderer) {
         };
 
         VK.update_descriptor_sets(renderer.device, .[write_descriptor_set], .[]);
+    }
+
+    { // Material buffers
+        material_data_size := renderer.materials.count * size_of(Material);
+
+        material_buffer := create_buffer(
+            renderer.device, renderer.allocator, .STORAGE_BUFFER | .SHADER_DEVICE_ADDRESS, xx material_data_size, .AUTO, mappable = true
+        );
+
+        material_buffer_id := add_buffer(*renderer.buffers, material_buffer);
+
+        map_copy_buffer_data(renderer.allocator, material_buffer, 0, renderer.materials.data, material_data_size);
     }
 }
 
@@ -634,6 +653,8 @@ DEPTH_FORMAT   :: VK.Format.D32_SFLOAT;
 // Though, the number of swapchain images should not be less than the number of frames in flight
 MAX_FRAMES_IN_FLIGHT_COUNT :: 2;
 
+MAX_TEXTURES :: 256;
+
 ASSERT_SUCCESS :: (name: string) #expand {
     assert(`result == .SUCCESS, name);
 }
@@ -642,7 +663,7 @@ create_descriptor_sets :: (device: VK.Device) -> VK.Descriptor_Pool, VK.Descript
     descriptor_pool_sizes := VK.Descriptor_Pool_Size.[
         {
             type             = .COMBINED_IMAGE_SAMPLER,
-            descriptor_count = 256,
+            descriptor_count = MAX_TEXTURES,
         },
     ];
 
@@ -660,7 +681,7 @@ create_descriptor_sets :: (device: VK.Device) -> VK.Descriptor_Pool, VK.Descript
         {
             binding          = 0,
             descriptor_type  = .COMBINED_IMAGE_SAMPLER,
-            descriptor_count = 256,
+            descriptor_count = MAX_TEXTURES,
             stage_flags      = .FRAGMENT,
         },
     ];
@@ -675,10 +696,10 @@ create_descriptor_sets :: (device: VK.Device) -> VK.Descriptor_Pool, VK.Descript
     };
 
     descriptor_set_layout_create_info := VK.Descriptor_Set_Layout_Create_Info.{
-        p_next = *flags_create_info,
-        flags = .UPDATE_AFTER_BIND_POOL,
+        p_next        = *flags_create_info,
+        flags         = .UPDATE_AFTER_BIND_POOL,
         binding_count = bindings.count,
-        p_bindings = bindings.data,
+        p_bindings    = bindings.data,
     };
 
     result =, descriptor_set_layout := VK.create_descriptor_set_layout(device, *descriptor_set_layout_create_info);
@@ -696,7 +717,7 @@ create_descriptor_sets :: (device: VK.Device) -> VK.Descriptor_Pool, VK.Descript
     return descriptor_pool, descriptor_set_layout, descriptor_sets[0];
 }
 
-add_buffer :: (buffers: *[..]GPU_Buffer, buffer: GPU_Buffer) -> int {
+add_buffer :: (buffers: *[..]GPU_Buffer, buffer: GPU_Buffer) -> id: int {
     array_add(buffers, buffer);
 
     return buffers.count;
@@ -1025,13 +1046,21 @@ destroy_graphics_pipeline :: (device: VK.Device, graphics_pipeline_info: *Graphi
     graphics_pipeline_info.* = {};
 }
 
-create_graphics_pipeline :: (device: VK.Device) -> Graphics_Pipeline_Info {
+create_graphics_pipeline :: (device: VK.Device, descriptor_set_layout: VK.Descriptor_Set_Layout) -> Graphics_Pipeline_Info {
     graphics_pipeline_info: Graphics_Pipeline_Info;
 
     { // Pipeline layout
+        push_constant_range := VK.Push_Constant_Range.{
+            stage_flags = .VERTEX | .FRAGMENT,
+            offset      = 0,
+            size        = size_of(Frame_Constants),
+        };
+
         layout_create_info := VK.Pipeline_Layout_Create_Info.{
-            set_layout_count          = 0,
-            push_constant_range_count = 0,
+            set_layout_count          = 1,
+            p_set_layouts             = *descriptor_set_layout,
+            push_constant_range_count = 1,
+            p_push_constant_ranges    = *push_constant_range,
         };
 
         result:, graphics_pipeline_info.layout = VK.create_pipeline_layout(device, *layout_create_info);
