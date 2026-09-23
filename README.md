@@ -8,4 +8,8 @@ Currently:
 - Dynamic rendering
 - Indirect drawing
 - Vertex pulling
+- Bindless textures
 - etc
+
+![mario](./assets/images/mario.png)
+![barn](./assets/images/barn.png)

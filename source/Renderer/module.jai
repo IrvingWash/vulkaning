@@ -63,8 +63,6 @@ Renderer :: struct {
     global_descriptor_set_layout: VK.Descriptor_Set_Layout;
     global_descriptor_set:        VK.Descriptor_Set;
 
-    camera: Camera;
-
     node_render_stack: [..]struct{ node: *Node; matrix: Matrix4; };
 
     dirty: bool = true;
@@ -115,16 +113,19 @@ GPU_Buffer :: struct {
     device_address:  u64;
 }
 
-Camera :: struct {
-    yaw:      float = 1.570796;
-    pitch:    float;
-    distance: float = 10;
-}
-
 Render_Item :: struct {
     wvp:            Matrix4;
     world_matrix:   Matrix4;
     material_index: u32;
+}
+
+Camera :: struct {
+    position: Vector3;
+
+    near_plane: float;
+    far_plane:  float;
+
+    fov: float;
 }
 
 init :: (
@@ -420,7 +421,7 @@ start_rendering :: (renderer: *Renderer) {
     }
 }
 
-render :: (renderer: *Renderer, nodes: []Node) {
+render :: (renderer: *Renderer, nodes: []Node, camera: $T/interface Camera) {
     if renderer.should_recreate_swapchain {
         VK.device_wait_idle(renderer.device);
 
@@ -482,16 +483,10 @@ render :: (renderer: *Renderer, nodes: []Node) {
         ASSERT_SUCCESS("Acquire next image");
     }
 
-    camera_position := Vector3.{
-        cos(renderer.camera.yaw) * cos(renderer.camera.pitch),
-        sin(renderer.camera.pitch),
-        sin(renderer.camera.yaw) * cos(renderer.camera.pitch)
-    } * renderer.camera.distance;
-
     aspect_ratio := cast(float, renderer.swapchain_info.config.image_extent.width) / cast(float, renderer.swapchain_info.config.image_extent.height);
 
-    view_transform    := make_look_at_matrix(camera_position, { 0, 0, 0 }, { 0, 1, 0 }, x_is_forward = false);
-    projection_matrix := make_projection_matrix(1.308997, aspect_ratio, 0.01, 1000, depth_range_01 = true);
+    view_transform    := make_look_at_matrix(camera.position, { 0, 0, 0 }, { 0, 1, 0 }, x_is_forward = false);
+    projection_matrix := make_projection_matrix(camera.fov, aspect_ratio, camera.near_plane, camera.far_plane, depth_range_01 = true);
     view_projection_matrix := projection_matrix * view_transform;
 
     array_reset(*renderer.node_render_stack);

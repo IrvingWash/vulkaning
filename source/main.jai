@@ -25,6 +25,21 @@ State :: struct {
     renderer: Renderer.Renderer;
 
     nodes: [..]Renderer.Node;
+
+    camera: Camera;
+}
+
+Camera :: struct {
+    position: Vector3;
+
+    yaw:      float = 1.570796;
+    pitch:    float;
+    distance: float = 10;
+
+    near_plane: float = 0.01;
+    far_plane:  float = 1000;
+
+    fov: float = 1.308997;
 }
 
 main :: () {
@@ -52,7 +67,7 @@ main :: () {
 
         Renderer.start_rendering(*state.renderer);
 
-        Renderer.render(*state.renderer, state.nodes);
+        Renderer.render(*state.renderer, state.nodes, state.camera);
 
         reset_temporary_storage();
     }
@@ -495,26 +510,33 @@ process_input :: (state: *State) {
         DELTA_TIME :: 0.016; // @Todo calculate the actual DT
 
         if keyboard_state[SDL.Scancode.A] {
-            state.renderer.camera.yaw += SPEED * DELTA_TIME;
+            state.camera.yaw += SPEED * DELTA_TIME;
         }
         if keyboard_state[SDL.Scancode.D] {
-            state.renderer.camera.yaw -= SPEED * DELTA_TIME;
+            state.camera.yaw -= SPEED * DELTA_TIME;
         }
         if keyboard_state[SDL.Scancode.W] {
-            state.renderer.camera.distance -= SPEED * DELTA_TIME;
-            state.renderer.camera.distance = max(state.renderer.camera.distance, EPSILON);
+            state.camera.distance -= SPEED * DELTA_TIME;
+            state.camera.distance = max(state.camera.distance, EPSILON);
         }
         if keyboard_state[SDL.Scancode.S] {
-            state.renderer.camera.distance += SPEED * DELTA_TIME;
+            state.camera.distance += SPEED * DELTA_TIME;
         }
         if keyboard_state[SDL.Scancode.UP] {
-            state.renderer.camera.pitch += SPEED * DELTA_TIME;
-            state.renderer.camera.pitch = clamp(state.renderer.camera.pitch, -PITCH_LIMIT, PITCH_LIMIT);
+            state.camera.pitch += SPEED * DELTA_TIME;
+            state.camera.pitch = clamp(state.camera.pitch, -PITCH_LIMIT, PITCH_LIMIT);
         }
         if keyboard_state[SDL.Scancode.DOWN] {
-            state.renderer.camera.pitch -= SPEED * DELTA_TIME;
-            state.renderer.camera.pitch = clamp(state.renderer.camera.pitch, -PITCH_LIMIT, PITCH_LIMIT);
+            state.camera.pitch -= SPEED * DELTA_TIME;
+            state.camera.pitch = clamp(state.camera.pitch, -PITCH_LIMIT, PITCH_LIMIT);
         }
+
+
+        state.camera.position = Vector3.{
+            cos(state.camera.yaw) * cos(state.camera.pitch),
+            sin(state.camera.pitch),
+            sin(state.camera.yaw) * cos(state.camera.pitch)
+        } * state.camera.distance;
     }
 }
 
