@@ -21,6 +21,9 @@ Fence                 :: #type *Fence_T;
 Framebuffer           :: #type *Framebuffer_T;
 Buffer                :: #type *Buffer_T;
 Sampler               :: #type *Sampler_T;
+Descriptor_Set        :: #type *Descriptor_Set_T;
+Buffer_View           :: #type *Buffer_View_T;
+Descriptor_Pool       :: #type *Descriptor_Pool_T;
 
 Device_Address :: #type u64;
 
@@ -1069,6 +1072,88 @@ Buffer_Copy :: struct {
     size:       Device_Size;
 }
 
+Descriptor_Image_Info :: struct {
+    sampler:      Sampler;
+    image_view:   Image_View;
+    image_layout: Image_Layout;
+}
+
+Write_Descriptor_Set :: struct {
+    s_type               := Structure_Type.WRITE_DESCRIPTOR_SET;
+    p_next:              *void;
+    dst_set:             Descriptor_Set;
+    dst_binding:         u32;
+    dst_array_element:   u32;
+    descriptor_count:    u32;
+    descriptor_type:     Descriptor_Type;
+    p_image_info:        *Descriptor_Image_Info;
+    p_buffer_info:       *Descriptor_Buffer_Info;
+    p_texel_buffer_view: *Buffer_View;
+}
+
+Descriptor_Buffer_Info :: struct {
+    buffer: Buffer;
+    offset: Device_Size;
+    range:  Device_Size;
+}
+
+Copy_Descriptor_Set :: struct {
+    s_type             := Structure_Type.COPY_DESCRIPTOR_SET;
+    p_next:            *void;
+    src_set:           Descriptor_Set;
+    src_binding:       u32;
+    src_array_element: u32;
+    dst_set:           Descriptor_Set;
+    dst_binding:       u32;
+    dst_array_element: u32;
+    descriptor_count:  u32;
+}
+
+Descriptor_Pool_Size :: struct {
+    type: Descriptor_Type;
+    descriptor_count: u32;
+}
+
+Descriptor_Pool_Create_Info :: struct {
+    s_type           := Structure_Type.DESCRIPTOR_POOL_CREATE_INFO;
+    p_next:          *void;
+    flags:           Descriptor_Pool_Create_Flags;
+    max_sets:        u32;
+    pool_size_count: u32;
+    p_pool_sizes:    *Descriptor_Pool_Size;
+}
+
+Descriptor_Set_Layout_Binding :: struct {
+    binding:              u32;
+    descriptor_type:      Descriptor_Type;
+    descriptor_count:     u32;
+    stage_flags:          Shader_Stage_Flags;
+    p_immutable_samplers: *Sampler;
+}
+
+Descriptor_Set_Layout_Binding_Flags_Create_Info :: struct {
+    s_type :=        Structure_Type.DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+    p_next:          *void;
+    binding_count:   u32;
+    p_binding_flags: *Descriptor_Binding_Flags;
+}
+
+Descriptor_Set_Layout_Create_Info :: struct {
+    s_type         := Structure_Type.DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    p_next:        *void;
+    flags:         Descriptor_Set_Layout_Create_Flags;
+    binding_count: u32;
+    p_bindings:    *Descriptor_Set_Layout_Binding;
+}
+
+Descriptor_Set_Allocate_Info :: struct {
+    s_type                := Structure_Type.DESCRIPTOR_SET_ALLOCATE_INFO;
+    p_next:               *void;
+    descriptor_pool:      Descriptor_Pool;
+    descriptor_set_count: u32;
+    p_set_layouts:        *Descriptor_Set_Layout;
+}
+
 Dependency_Flags :: enum_flags u32 {
     BY_REGION                                          :: 1;
     DEVICE_GROUP                                       :: 4;
@@ -1764,6 +1849,41 @@ Sampler_Create_Flags :: enum_flags u32 {
     DESCRIPTOR_BUFFER_CAPTURE_REPLAY_EXT :: 0x00000008;
     NON_SEAMLESS_CUBE_MAP_EXT            :: 0x00000004;
     IMAGE_PROCESSING_QCOM                :: 0x00000010;
+}
+
+Descriptor_Pool_Create_Flags :: enum_flags u32 {
+    FREE_DESCRIPTOR_SET           :: 0x00000001;
+    UPDATE_AFTER_BIND             :: 0x00000002;
+    HOST_ONLY_EXT                 :: 0x00000004;
+    ALLOW_OVERALLOCATION_SETS_NV  :: 0x00000008;
+    ALLOW_OVERALLOCATION_POOLS_NV :: 0x00000010;
+    UPDATE_AFTER_BIND_EXT         :: UPDATE_AFTER_BIND;
+    HOST_ONLY_VALVE               :: HOST_ONLY_EXT;
+}
+
+Descriptor_Binding_Flags :: enum_flags u32 {
+    UPDATE_AFTER_BIND               :: 0x00000001;
+    UPDATE_UNUSED_WHILE_PENDING     :: 0x00000002;
+    PARTIALLY_BOUND                 :: 0x00000004;
+    VARIABLE_DESCRIPTOR_COUNT       :: 0x00000008;
+    UPDATE_AFTER_BIND_EXT           :: UPDATE_AFTER_BIND;
+    UPDATE_UNUSED_WHILE_PENDING_EXT :: UPDATE_UNUSED_WHILE_PENDING;
+    PARTIALLY_BOUND_EXT             :: PARTIALLY_BOUND;
+    VARIABLE_DESCRIPTOR_COUNT_EXT   :: VARIABLE_DESCRIPTOR_COUNT;
+}
+
+
+Descriptor_Set_Layout_Create_Flags :: enum_flags u32 {
+    UPDATE_AFTER_BIND_POOL          :: 0x00000002;
+    PUSH_DESCRIPTOR                 :: 0x00000001;
+    DESCRIPTOR_BUFFER_EXT           :: 0x00000010;
+    EMBEDDED_IMMUTABLE_SAMPLERS_EXT :: 0x00000020;
+    INDIRECT_BINDABLE_NV            :: 0x00000080;
+    HOST_ONLY_POOL_EXT              :: 0x00000004;
+    PER_STAGE_NV                    :: 0x00000040;
+    PUSH_DESCRIPTOR_KHR             :: PUSH_DESCRIPTOR;
+    UPDATE_AFTER_BIND_POOL_EXT      :: UPDATE_AFTER_BIND_POOL;
+    HOST_ONLY_POOL_VALVE            :: HOST_ONLY_POOL_EXT;
 }
 
 Structure_Type :: enum u32 {
@@ -4181,6 +4301,30 @@ Border_Color :: enum u32 {
     INT_CUSTOM_EXT          :: 1000287004;
 }
 
+Descriptor_Type :: enum u32 {
+    SAMPLER                               :: 0;
+    COMBINED_IMAGE_SAMPLER                :: 1;
+    SAMPLED_IMAGE                         :: 2;
+    STORAGE_IMAGE                         :: 3;
+    UNIFORM_TEXEL_BUFFER                  :: 4;
+    STORAGE_TEXEL_BUFFER                  :: 5;
+    UNIFORM_BUFFER                        :: 6;
+    STORAGE_BUFFER                        :: 7;
+    UNIFORM_BUFFER_DYNAMIC                :: 8;
+    STORAGE_BUFFER_DYNAMIC                :: 9;
+    INPUT_ATTACHMENT                      :: 10;
+    INLINE_UNIFORM_BLOCK                  :: 1000138000;
+    ACCELERATION_STRUCTURE_KHR            :: 1000150000;
+    ACCELERATION_STRUCTURE_NV             :: 1000165000;
+    SAMPLE_WEIGHT_IMAGE_QCOM              :: 1000440000;
+    BLOCK_MATCH_IMAGE_QCOM                :: 1000440001;
+    TENSOR_ARM                            :: 1000460000;
+    MUTABLE_EXT                           :: 1000351000;
+    PARTITIONED_ACCELERATION_STRUCTURE_NV :: 1000570000;
+    INLINE_UNIFORM_BLOCK_EXT              :: INLINE_UNIFORM_BLOCK;
+    MUTABLE_VALVE                         :: MUTABLE_EXT;
+}
+
 make_version :: (major: u32, minor: u32, patch: u32) -> u32 {
     return (major << 22) | (minor << 12) | patch;
 }
@@ -4731,6 +4875,65 @@ cmd_copy_buffer :: inline (
     vkCmdCopyBuffer(command_buffer, src_buffer, dst_buffer, xx regions.count, regions.data);
 }
 
+update_descriptor_sets :: inline (
+    device: Device,
+    descriptor_writes: []Write_Descriptor_Set,
+    descriptor_copies: []Copy_Descriptor_Set,
+) {
+    vkUpdateDescriptorSets(
+        device,
+        xx descriptor_writes.count,
+        descriptor_writes.data,
+        xx descriptor_copies.count,
+        descriptor_copies.data,
+    );
+}
+
+create_descriptor_pool :: inline (
+    device:        Device,
+    p_create_info: *Descriptor_Pool_Create_Info,
+    p_allocator:   *Allocation_Callbacks = null,
+) -> Result, Descriptor_Pool {
+    descriptor_pool: Descriptor_Pool;
+
+    result := vkCreateDescriptorPool(device, p_create_info, p_allocator, *descriptor_pool);
+
+    return result, descriptor_pool;
+}
+
+create_descriptor_set_layout :: inline (
+    device: Device,
+    p_create_info: *Descriptor_Set_Layout_Create_Info,
+    p_allocator: *Allocation_Callbacks = null,
+) -> Result, Descriptor_Set_Layout {
+    set_layout: Descriptor_Set_Layout;
+
+    result := vkCreateDescriptorSetLayout(device, p_create_info, p_allocator, *set_layout);
+
+    return result, set_layout;
+}
+
+allocate_descriptor_sets :: (device: Device, p_allocate_info: *Descriptor_Set_Allocate_Info) -> Result, [..]Descriptor_Set {
+    descriptor_sets: [..]Descriptor_Set;
+    array_resize(*descriptor_sets, p_allocate_info.descriptor_set_count);
+
+    result := vkAllocateDescriptorSets(device, p_allocate_info, descriptor_sets.data);
+
+    return result, descriptor_sets;
+}
+
+destroy_descriptor_pool :: (
+    device:          Device,
+    descriptor_pool: Descriptor_Pool,
+    p_allocator:     *Allocation_Callbacks = null,
+) -> void #foreign libvulkan "vkDestroyDescriptorPool";
+
+destroy_descriptor_set_layout :: (
+    device:                Device,
+    descriptor_set_layout: Descriptor_Set_Layout,
+    p_allocator:           *Allocation_Callbacks = null,
+) -> void #foreign libvulkan "vkDestroyDescriptorSetLayout";
+
 
 
 #scope_file
@@ -4758,6 +4961,9 @@ Fence_T                 :: struct {}
 Framebuffer_T           :: struct {}
 Buffer_T                :: struct {}
 Sampler_T               :: struct {}
+Descriptor_Set_T        :: struct {}
+Buffer_View_T           :: struct {}
+Descriptor_Pool_T       :: struct {}
 
 vkCreateInstance :: (
     p_create_info: *Instance_Create_Info,
@@ -4940,6 +5146,34 @@ vkCmdCopyBuffer :: (
     p_regions:      *Buffer_Copy,
 ) -> void #foreign libvulkan;
 
+vkUpdateDescriptorSets :: (
+    device:                 Device,
+    descriptor_write_count: u32,
+    p_descriptor_writes:    *Write_Descriptor_Set,
+    descriptor_copy_count:  u32,
+    p_descriptor_copies:    *Copy_Descriptor_Set,
+) -> void #foreign libvulkan;
+
+vkCreateDescriptorPool :: (
+    device:            Device,
+    p_create_info:     *Descriptor_Pool_Create_Info,
+    p_allocator:       *Allocation_Callbacks,
+    p_descriptor_pool: *Descriptor_Pool,
+) -> Result #foreign libvulkan;
+
+
+vkCreateDescriptorSetLayout :: (
+    device:      Device,
+    pCreateInfo: *Descriptor_Set_Layout_Create_Info,
+    pAllocator:  *Allocation_Callbacks,
+    pSetLayout:  *Descriptor_Set_Layout
+) -> Result #foreign libvulkan;
+
+vkAllocateDescriptorSets :: (
+    device:            Device,
+    p_allocate_info:   *Descriptor_Set_Allocate_Info,
+    p_descriptor_sets: *Descriptor_Set
+) -> Result #foreign libvulkan;
 
 #if OS == {
     case .LINUX;

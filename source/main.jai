@@ -138,8 +138,6 @@ load_gltf_file :: (path: string, renderer: *Renderer.Renderer, nodes: *[..]Rende
     {
         samplers_params: [..]Renderer.Create_Sampler_Params;
         samplers_params.allocator = temp;
-        array_resize(*samplers_params, gltf_model.samplers_count);
-
         for 0 .. gltf_model.samplers_count - 1 {
             gltf_sampler := gltf_model.samplers[it];
 
@@ -214,6 +212,7 @@ load_gltf_file :: (path: string, renderer: *Renderer.Renderer, nodes: *[..]Rende
 
             array_add(
                 *samplers_params,
+                params,
             );
         }
 

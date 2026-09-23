@@ -58,6 +58,10 @@ Renderer :: struct {
     vertex_buffer_id: int;
     index_buffer_id:  int;
 
+    global_descriptor_pool:       VK.Descriptor_Pool;
+    global_descriptor_set_layout: VK.Descriptor_Set_Layout;
+    global_descriptor_set:        VK.Descriptor_Set;
+
     dirty: bool = true;
 }
 
@@ -170,11 +174,18 @@ init :: (
     array_resize(*renderer.vertices, VERTEX_BUFFER_SIZE / size_of(Vertex));
     array_resize(*renderer.indices, INDEX_BUFFER_SIZE / size_of(u32));
 
+    renderer.global_descriptor_pool,
+        renderer.global_descriptor_set_layout,
+        renderer.global_descriptor_set = create_descriptor_sets(renderer.device);
+
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
     VK.device_wait_idle(renderer.device);
+
+    VK.destroy_descriptor_set_layout(renderer.device, renderer.global_descriptor_set_layout);
+    VK.destroy_descriptor_pool(renderer.device, renderer.global_descriptor_pool);
 
     for buffer: renderer.buffers {
         VMA.destroy_buffer(renderer.allocator, buffer.buffer, buffer.allocation);
@@ -257,14 +268,11 @@ upload_images :: (renderer: *Renderer, images: []Image) -> image_ids: [..]u32 {
 
     staging_buffers: [..]GPU_Buffer;
     staging_buffers.allocator = temp;
-    array_resize(*staging_buffers, images.count);
     defer for buffer: staging_buffers {
         VMA.destroy_buffer(renderer.allocator, buffer.buffer, buffer.allocation);
     }
 
     gpu_image_ids: [..]u32;
-    array_resize(*gpu_image_ids, images.count);
-
     for image: images {
         gpu_image, buffer := create_gpu_image(renderer.device, renderer.allocator, command_buffer, image);
 
@@ -290,54 +298,83 @@ start_rendering :: (renderer: *Renderer) {
 
     defer renderer.dirty = false;
 
-    vertex_staging_buffer := create_buffer(
-        renderer.device, renderer.allocator, .TRANSFER_SRC, VERTEX_BUFFER_SIZE, .AUTO, mappable = true
-    );
-    defer VMA.destroy_buffer(renderer.allocator, vertex_staging_buffer.buffer, vertex_staging_buffer.allocation);
-    map_copy_buffer_data(renderer.allocator, vertex_staging_buffer, 0, renderer.vertices.data, VERTEX_BUFFER_SIZE);
+    { // Upload vertex and index buffers
+        vertex_staging_buffer := create_buffer(
+            renderer.device, renderer.allocator, .TRANSFER_SRC, VERTEX_BUFFER_SIZE, .AUTO, mappable = true
+        );
+        defer VMA.destroy_buffer(renderer.allocator, vertex_staging_buffer.buffer, vertex_staging_buffer.allocation);
+        map_copy_buffer_data(renderer.allocator, vertex_staging_buffer, 0, renderer.vertices.data, VERTEX_BUFFER_SIZE);
 
-    index_staging_buffer  := create_buffer(
-        renderer.device, renderer.allocator, .TRANSFER_SRC, INDEX_BUFFER_SIZE, .AUTO, mappable = true
-    );
-    defer VMA.destroy_buffer(renderer.allocator, index_staging_buffer.buffer, index_staging_buffer.allocation);
-    map_copy_buffer_data(renderer.allocator, index_staging_buffer, 0, renderer.indices.data, INDEX_BUFFER_SIZE);
+        index_staging_buffer  := create_buffer(
+            renderer.device, renderer.allocator, .TRANSFER_SRC, INDEX_BUFFER_SIZE, .AUTO, mappable = true
+        );
+        defer VMA.destroy_buffer(renderer.allocator, index_staging_buffer.buffer, index_staging_buffer.allocation);
+        map_copy_buffer_data(renderer.allocator, index_staging_buffer, 0, renderer.indices.data, INDEX_BUFFER_SIZE);
 
-    vertex_buffer := create_buffer(
-        renderer.device,
-        renderer.allocator,
-        .TRANSFER_DST | .SHADER_DEVICE_ADDRESS,
-        VERTEX_BUFFER_SIZE,
-        .AUTO,
-        mappable = false,
-    );
-    renderer.vertex_buffer_id = add_buffer(*renderer.buffers, vertex_buffer);
+        vertex_buffer := create_buffer(
+            renderer.device,
+            renderer.allocator,
+            .TRANSFER_DST | .SHADER_DEVICE_ADDRESS,
+            VERTEX_BUFFER_SIZE,
+            .AUTO,
+            mappable = false,
+        );
+        renderer.vertex_buffer_id = add_buffer(*renderer.buffers, vertex_buffer);
 
-    index_buffer := create_buffer(
-        renderer.device,
-        renderer.allocator,
-        .TRANSFER_DST | .INDEX_BUFFER,
-        INDEX_BUFFER_SIZE,
-        .AUTO,
-        mappable = false,
-    );
-    renderer.index_buffer_id = add_buffer(*renderer.buffers, index_buffer);
+        index_buffer := create_buffer(
+            renderer.device,
+            renderer.allocator,
+            .TRANSFER_DST | .INDEX_BUFFER,
+            INDEX_BUFFER_SIZE,
+            .AUTO,
+            mappable = false,
+        );
+        renderer.index_buffer_id = add_buffer(*renderer.buffers, index_buffer);
 
-    command_buffer := start_transient_command_buffer(renderer.device, renderer.transient_command_pool);
+        command_buffer := start_transient_command_buffer(renderer.device, renderer.transient_command_pool);
 
-    vertex_buffer_copy := VK.Buffer_Copy.{
-        src_offset = 0,
-        dst_offset = 0,
-        size       = VERTEX_BUFFER_SIZE,
-    };
-    index_buffer_copy := VK.Buffer_Copy.{
-        src_offset = 0,
-        dst_offset = 0,
-        size       = INDEX_BUFFER_SIZE,
-    };
-    VK.cmd_copy_buffer(command_buffer, vertex_staging_buffer.buffer, vertex_buffer.buffer, .[vertex_buffer_copy]);
-    VK.cmd_copy_buffer(command_buffer, index_staging_buffer.buffer, index_buffer.buffer, .[index_buffer_copy]);
+        vertex_buffer_copy := VK.Buffer_Copy.{
+            src_offset = 0,
+            dst_offset = 0,
+            size       = VERTEX_BUFFER_SIZE,
+        };
+        index_buffer_copy := VK.Buffer_Copy.{
+            src_offset = 0,
+            dst_offset = 0,
+            size       = INDEX_BUFFER_SIZE,
+        };
+        VK.cmd_copy_buffer(command_buffer, vertex_staging_buffer.buffer, vertex_buffer.buffer, .[vertex_buffer_copy]);
+        VK.cmd_copy_buffer(command_buffer, index_staging_buffer.buffer, index_buffer.buffer, .[index_buffer_copy]);
 
-    submit_transient_command_buffer(renderer.device, renderer.transient_command_pool, renderer.graphics_queue, command_buffer);
+        submit_transient_command_buffer(renderer.device, renderer.transient_command_pool, renderer.graphics_queue, command_buffer);
+    }
+
+    { // Update texture descriptors
+        image_descriptors: [..]VK.Descriptor_Image_Info;
+        image_descriptors.allocator = temp;
+
+        for texture: renderer.textures {
+            array_add(
+                *image_descriptors,
+                {
+                    sampler      = renderer.samplers[texture.sampler_id - 1],
+                    image_view   = renderer.gpu_images[texture.image_id - 1].image_view,
+                    image_layout = .SHADER_READ_ONLY_OPTIMAL,
+                }
+            );
+        }
+
+        write_descriptor_set := VK.Write_Descriptor_Set.{
+            dst_set           = renderer.global_descriptor_set,
+            dst_binding       = 0,
+            dst_array_element = 0,
+            descriptor_count  = xx image_descriptors.count,
+            descriptor_type   = .COMBINED_IMAGE_SAMPLER,
+            p_image_info        = image_descriptors.data,
+        };
+
+        VK.update_descriptor_sets(renderer.device, .[write_descriptor_set], .[]);
+    }
 }
 
 render :: (renderer: *Renderer) {
@@ -599,6 +636,64 @@ MAX_FRAMES_IN_FLIGHT_COUNT :: 2;
 
 ASSERT_SUCCESS :: (name: string) #expand {
     assert(`result == .SUCCESS, name);
+}
+
+create_descriptor_sets :: (device: VK.Device) -> VK.Descriptor_Pool, VK.Descriptor_Set_Layout, VK.Descriptor_Set {
+    descriptor_pool_sizes := VK.Descriptor_Pool_Size.[
+        {
+            type             = .COMBINED_IMAGE_SAMPLER,
+            descriptor_count = 256,
+        },
+    ];
+
+    descriptor_pool_create_info := VK.Descriptor_Pool_Create_Info.{
+        flags           = .UPDATE_AFTER_BIND,
+        max_sets        = 1,
+        pool_size_count = descriptor_pool_sizes.count,
+        p_pool_sizes      = descriptor_pool_sizes.data,
+    };
+
+    result, descriptor_pool := VK.create_descriptor_pool(device, *descriptor_pool_create_info);
+    ASSERT_SUCCESS("Create descriptor pool");
+
+    bindings := VK.Descriptor_Set_Layout_Binding.[
+        {
+            binding          = 0,
+            descriptor_type  = .COMBINED_IMAGE_SAMPLER,
+            descriptor_count = 256,
+            stage_flags      = .FRAGMENT,
+        },
+    ];
+
+    flags := VK.Descriptor_Binding_Flags.[
+        .PARTIALLY_BOUND | .UPDATE_AFTER_BIND,
+    ];
+
+    flags_create_info := VK.Descriptor_Set_Layout_Binding_Flags_Create_Info.{
+        binding_count   = flags.count,
+        p_binding_flags = flags.data,
+    };
+
+    descriptor_set_layout_create_info := VK.Descriptor_Set_Layout_Create_Info.{
+        p_next = *flags_create_info,
+        flags = .UPDATE_AFTER_BIND_POOL,
+        binding_count = bindings.count,
+        p_bindings = bindings.data,
+    };
+
+    result =, descriptor_set_layout := VK.create_descriptor_set_layout(device, *descriptor_set_layout_create_info);
+    ASSERT_SUCCESS("Create descriptor set layout");
+
+    descriptor_set_allocate_info := VK.Descriptor_Set_Allocate_Info.{
+        descriptor_pool      = descriptor_pool,
+        descriptor_set_count = 1,
+        p_set_layouts        = *descriptor_set_layout,
+    };
+
+    result =, descriptor_sets := VK.allocate_descriptor_sets(device, *descriptor_set_allocate_info);
+    defer array_free(descriptor_sets);
+
+    return descriptor_pool, descriptor_set_layout, descriptor_sets[0];
 }
 
 add_buffer :: (buffers: *[..]GPU_Buffer, buffer: GPU_Buffer) -> int {
@@ -1256,7 +1351,9 @@ create_device :: (physical_device: VK.Physical_Device, graphics_qfi: u32) -> VK.
             supported_features_13.dynamic_rendering
             && supported_features_13.synchronization_2
             && supported_features_12.timeline_semaphore
-            && supported_features_12.buffer_device_address,
+            && supported_features_12.buffer_device_address
+            && supported_features_12.descriptor_binding_sampled_image_update_after_bind
+            && supported_features_12.descriptor_binding_partially_bound,
             "One of the required features is not supported",
         );
     }
@@ -1268,9 +1365,11 @@ create_device :: (physical_device: VK.Physical_Device, graphics_qfi: u32) -> VK.
         dynamic_rendering = VK.TRUE,
     };
     desired_features_12 := VK.Physical_Device_Vulkan_1_2_Features.{
-        p_next                = *desired_features_13,
-        timeline_semaphore    = VK.TRUE,
-        buffer_device_address = VK.TRUE,
+        p_next                                             = *desired_features_13,
+        timeline_semaphore                                 = VK.TRUE,
+        buffer_device_address                              = VK.TRUE,
+        descriptor_binding_sampled_image_update_after_bind = VK.TRUE,
+        descriptor_binding_partially_bound                 = VK.TRUE,
     };
     desired_features := VK.Physical_Device_Features_2.{ p_next = *desired_features_12 };
 
