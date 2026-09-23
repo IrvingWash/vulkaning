@@ -52,7 +52,7 @@ main :: () {
 
         Renderer.start_rendering(*state.renderer);
 
-        Renderer.render(*state.renderer);
+        Renderer.render(*state.renderer, state.nodes);
 
         reset_temporary_storage();
     }
@@ -164,7 +164,7 @@ load_gltf_file :: (path: string, renderer: *Renderer.Renderer, nodes: *[..]Rende
                 case xx TG.Texture_Wrap.CLAMP_TO_EDGE;
                     params.address_mode_v = .CLAMP_TO_EDGE;
                 case xx TG.Texture_Wrap.MIRRORED_REPEAT;
-                    params.address_mode_u = .MIRRORED_REPEAT;
+                    params.address_mode_v = .MIRRORED_REPEAT;
             }
 
             if gltf_sampler.mag_filter == {
@@ -264,7 +264,7 @@ load_gltf_file :: (path: string, renderer: *Renderer.Renderer, nodes: *[..]Rende
         gltf_mesh := gltf_model.meshes[gltf_mesh_index];
 
         mesh: Renderer.Mesh;
-        if !gltf_mesh.name.data {
+        if gltf_mesh.name.data {
             mesh.name = copy_string({
                 gltf_mesh.name.len,
                 gltf_mesh.name.data,
@@ -300,7 +300,7 @@ load_gltf_file :: (path: string, renderer: *Renderer.Renderer, nodes: *[..]Rende
                             element_offset := buffer_offset + gltf_accessor_index * stride;
                             data: *float = cast(*float, gltf_buffer.data.data + element_offset);
 
-                            renderer.vertices[renderer.vertex_offset + gltf_accessor_index].position = { data[0], data[1], data[3] };
+                            renderer.vertices[renderer.vertex_offset + gltf_accessor_index].position = { data[0], data[1], data[2] };
                         }
                     case "NORMAL";
                         assert(gltf_accessor.type == xx TG._Type.VEC3 && gltf_accessor.component_type == xx TG.Component_Type.FLOAT);
@@ -316,7 +316,7 @@ load_gltf_file :: (path: string, renderer: *Renderer.Renderer, nodes: *[..]Rende
                             element_offset := buffer_offset + gltf_accessor_index * stride;
                             data: *float = cast(*float, gltf_buffer.data.data + element_offset);
 
-                            renderer.vertices[renderer.vertex_offset + gltf_accessor_index].normal = { data[0], data[1], data[3] };
+                            renderer.vertices[renderer.vertex_offset + gltf_accessor_index].normal = { data[0], data[1], data[2] };
                         }
                     case "COLOR_0";
                         assert(gltf_accessor.type == xx TG._Type.VEC3 || gltf_accessor.type == xx TG._Type.VEC4);
@@ -333,7 +333,7 @@ load_gltf_file :: (path: string, renderer: *Renderer.Renderer, nodes: *[..]Rende
                             element_offset := buffer_offset + gltf_accessor_index * stride;
                             data: *float = cast(*float, gltf_buffer.data.data + element_offset);
 
-                            renderer.vertices[renderer.vertex_offset + gltf_accessor_index].color = { data[0], data[1], data[3] };
+                            renderer.vertices[renderer.vertex_offset + gltf_accessor_index].color = { data[0], data[1], data[2] };
                         }
                     case "TEXCOORD_0";
                         assert(gltf_accessor.type == xx TG._Type.VEC2 && gltf_accessor.component_type == xx TG.Component_Type.FLOAT);
@@ -343,7 +343,7 @@ load_gltf_file :: (path: string, renderer: *Renderer.Renderer, nodes: *[..]Rende
                         buffer_offset := gltf_buffer_view.byte_offset + gltf_accessor.byte_offset;
                         stride := ifx gltf_buffer_view.byte_stride != 0
                             then gltf_buffer_view.byte_stride
-                            else size_of(Vector3);
+                            else size_of(Vector2);
 
                         for gltf_accessor_index: 0 .. gltf_accessor.count - 1 {
                             element_offset := buffer_offset + gltf_accessor_index * stride;
@@ -377,10 +377,10 @@ load_gltf_file :: (path: string, renderer: *Renderer.Renderer, nodes: *[..]Rende
 
                 renderer.index_offset += mesh.sub_meshes[gltf_primitive_index].index_count;
             }
-
-            array_add(*renderer.meshes, mesh);
-            array_add(*mesh_ids, xx renderer.meshes.count);
         }
+
+        array_add(*renderer.meshes, mesh);
+        array_add(*mesh_ids, xx renderer.meshes.count);
     }
 
     {
@@ -412,6 +412,7 @@ load_gltf_file :: (path: string, renderer: *Renderer.Renderer, nodes: *[..]Rende
                 for component: gltf_node.matrix {
                     node.transform.floats[it_index] = xx component;
                 }
+                node.transform = transpose(node.transform);
                 node.dirty = false;
             } else {
                 for component: gltf_node.translation {
@@ -469,15 +470,50 @@ load_gltf_file :: (path: string, renderer: *Renderer.Renderer, nodes: *[..]Rende
 
 process_input :: (state: *State) {
     event: SDL.Event;
+
+    keyboard_state := SDL.get_keyboard_state(null);
+
     while SDL.poll_event(*event) {
         if event.type == {
             case .QUIT;
                 state.is_running = false;
                 break;
-            case .WINDOW_RESIZED;
+            case .WINDOW_RESIZED; #through;
+            case .WINDOW_PIXEL_SIZE_CHANGED;
                 state.width  = event.window.data1;
                 state.height = event.window.data2;
+                state.renderer.should_recreate_swapchain = true;
                 break;
+
+        }
+    }
+
+    { // Update camera;
+        SPEED :: 1;
+        EPSILON :: 0.01;
+        PITCH_LIMIT :: PI / 2 - EPSILON;
+        DELTA_TIME :: 0.016; // @Todo calculate the actual DT
+
+        if keyboard_state[SDL.Scancode.A] {
+            state.renderer.camera.yaw += SPEED * DELTA_TIME;
+        }
+        if keyboard_state[SDL.Scancode.D] {
+            state.renderer.camera.yaw -= SPEED * DELTA_TIME;
+        }
+        if keyboard_state[SDL.Scancode.W] {
+            state.renderer.camera.distance -= SPEED * DELTA_TIME;
+            state.renderer.camera.distance = max(state.renderer.camera.distance, EPSILON);
+        }
+        if keyboard_state[SDL.Scancode.S] {
+            state.renderer.camera.distance += SPEED * DELTA_TIME;
+        }
+        if keyboard_state[SDL.Scancode.UP] {
+            state.renderer.camera.pitch += SPEED * DELTA_TIME;
+            state.renderer.camera.pitch = clamp(state.renderer.camera.pitch, -PITCH_LIMIT, PITCH_LIMIT);
+        }
+        if keyboard_state[SDL.Scancode.DOWN] {
+            state.renderer.camera.pitch -= SPEED * DELTA_TIME;
+            state.renderer.camera.pitch = clamp(state.renderer.camera.pitch, -PITCH_LIMIT, PITCH_LIMIT);
         }
     }
 }

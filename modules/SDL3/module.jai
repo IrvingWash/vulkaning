@@ -995,6 +995,7 @@ poll_event :: (event: *Event) -> bool #foreign libsdl3 "SDL_PollEvent";
 create_window :: (title: *u8, w: s32, h: s32, flags: Window_Flags) -> *Window #foreign libsdl3 "SDL_CreateWindow";
 destroy_window :: (window: *Window) -> void #foreign libsdl3 "SDL_DestroyWindow";
 quit :: () -> void #foreign libsdl3 "SDL_Quit";
+get_keyboard_state :: (numkeys: *s32) -> *bool #foreign libsdl3 "SDL_GetKeyboardState";
 
 get_window_size_in_pixels :: (window: *Window) -> width: s32, height: s32 {
     w, h: s32;

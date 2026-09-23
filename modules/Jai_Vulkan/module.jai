@@ -1154,6 +1154,39 @@ Descriptor_Set_Allocate_Info :: struct {
     p_set_layouts:        *Descriptor_Set_Layout;
 }
 
+Draw_Indexed_Indirect_Command :: struct {
+    index_count:    u32;
+    instance_count: u32;
+    first_index:    u32;
+    vertex_offset:  s32;
+    first_instance: u32;
+}
+
+Memory_Requirements :: struct {
+    size: Device_Size;
+    alignment: Device_Size;
+    memory_type_bits: u32;
+}
+
+Memory_Dedicated_Requirements :: struct {
+    s_type                       := Structure_Type.MEMORY_DEDICATED_REQUIREMENTS;
+    p_next:                       *void;
+    prefers_dedicated_allocation:  Bool;
+    requires_dedicated_allocation: Bool;
+}
+
+Buffer_Memory_Requirements_Info_2 :: struct {
+    s_type  := Structure_Type.BUFFER_MEMORY_REQUIREMENTS_INFO_2;
+    p_next: *void;
+    buffer: Buffer;
+}
+
+Memory_Requirements_2 :: struct {
+    s_type               := Structure_Type.MEMORY_REQUIREMENTS_2;
+    p_next:              *void;
+    memory_requirements: Memory_Requirements;
+}
+
 Dependency_Flags :: enum_flags u32 {
     BY_REGION                                          :: 1;
     DEVICE_GROUP                                       :: 4;
@@ -4325,6 +4358,16 @@ Descriptor_Type :: enum u32 {
     MUTABLE_VALVE                         :: MUTABLE_EXT;
 }
 
+Index_Type :: enum u32 {
+    UINT16    :: 0;
+    UINT32    :: 1;
+    UINT8     :: 1000265000;
+    NONE_KHR  :: 1000165000;
+    NONE_NV   :: NONE_KHR;
+    UINT8_EXT :: UINT8;
+    UINT8_KHR :: UINT8;
+}
+
 make_version :: (major: u32, minor: u32, patch: u32) -> u32 {
     return (major << 22) | (minor << 12) | patch;
 }
@@ -4934,6 +4977,76 @@ destroy_descriptor_set_layout :: (
     p_allocator:           *Allocation_Callbacks = null,
 ) -> void #foreign libvulkan "vkDestroyDescriptorSetLayout";
 
+create_buffer :: inline (
+    device:        Device,
+    p_create_info: *Buffer_Create_Info,
+    p_allocator:   *Allocation_Callbacks = null,
+) -> Result, Buffer {
+    buffer: Buffer;
+    result := vkCreateBuffer(device, p_create_info, p_allocator, *buffer);
+
+    return result, buffer;
+}
+
+get_buffer_memory_requirements :: (device: Device, buffer: Buffer) -> Memory_Requirements {
+    memory_reqs: Memory_Requirements;
+
+    vkGetBufferMemoryRequirements(device, buffer, *memory_reqs);
+
+    return memory_reqs;
+}
+
+get_buffer_memory_requirements_2 :: (
+    device:                Device,
+    p_info:                *Buffer_Memory_Requirements_Info_2,
+    p_memory_requirements: *Memory_Requirements_2,
+) -> void #foreign libvulkan "vkGetBufferMemoryRequirements2";
+
+cmd_bind_descriptor_sets :: inline (
+    command_buffer:      Command_Buffer,
+    pipeline_bind_point: Pipeline_Bind_Point,
+    layout:              Pipeline_Layout,
+    first_set:           u32,
+    descriptor_sets:     []Descriptor_Set,
+    dynamic_offsets:     []u32,
+) {
+    vkCmdBindDescriptorSets(
+        command_buffer,
+        pipeline_bind_point,
+        layout,
+        first_set,
+        xx descriptor_sets.count,
+        descriptor_sets.data,
+        xx dynamic_offsets.count,
+        dynamic_offsets.data,
+    );
+}
+
+cmd_push_constants :: (
+    command_buffer: Command_Buffer,
+    layout:         Pipeline_Layout,
+    stage_flags:    Shader_Stage_Flags,
+    offset:         u32,
+    size:           u32,
+    p_values:       *void,
+) -> void #foreign libvulkan "vkCmdPushConstants";
+
+
+cmd_bind_index_buffer :: (
+    command_buffer: Command_Buffer,
+    buffer:         Buffer,
+    offset:         Device_Size,
+    index_type:     Index_Type,
+) -> void #foreign libvulkan "vkCmdBindIndexBuffer";
+
+cmd_draw_indexed_indirect :: (
+    command_buffer: Command_Buffer,
+    buffer:         Buffer,
+    offset:         Device_Size,
+    draw_count:     u32,
+    stride:         u32,
+) -> void #foreign libvulkan "vkCmdDrawIndexedIndirect";
+
 
 
 #scope_file
@@ -5174,6 +5287,36 @@ vkAllocateDescriptorSets :: (
     p_allocate_info:   *Descriptor_Set_Allocate_Info,
     p_descriptor_sets: *Descriptor_Set
 ) -> Result #foreign libvulkan;
+
+vkCreateBuffer :: (
+    device:        Device,
+    p_create_info: *Buffer_Create_Info,
+    p_allocator:   *Allocation_Callbacks,
+    p_buffer:      *Buffer,
+) -> Result #foreign libvulkan;
+
+vkGetBufferMemoryRequirements :: (
+    device:                Device,
+    buffer:                Buffer,
+    p_memory_requirements: *Memory_Requirements,
+) -> void #foreign libvulkan;
+
+vkGetBufferMemoryRequirements2 :: (
+    device:                Device,
+    p_info:                *Buffer_Memory_Requirements_Info_2,
+    p_memory_requirements: *Memory_Requirements_2,
+) -> void #foreign libvulkan;
+
+vkCmdBindDescriptorSets :: (
+    command_buffer: Command_Buffer,
+    pipeline_bind_point: Pipeline_Bind_Point,
+    layout: Pipeline_Layout,
+    first_set: u32,
+    descriptor_set_count: u32,
+    p_descriptor_sets: *Descriptor_Set,
+    dynamic_offset_count: u32,
+    p_dynamic_offsets: *u32,
+) -> void #foreign libvulkan;
 
 #if OS == {
     case .LINUX;

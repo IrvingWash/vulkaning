@@ -63,6 +63,10 @@ Renderer :: struct {
     global_descriptor_set_layout: VK.Descriptor_Set_Layout;
     global_descriptor_set:        VK.Descriptor_Set;
 
+    camera: Camera;
+
+    node_render_stack: [..]struct{ node: *Node; matrix: Matrix4; };
+
     dirty: bool = true;
 }
 
@@ -86,6 +90,10 @@ Frame_Resources :: struct {
     command_pool:             VK.Command_Pool;
     command_buffer:           VK.Command_Buffer;
     image_acquired_semaphore: VK.Semaphore;
+    indirect_draw_buffer:     GPU_Buffer;
+    indirect_draw_pointer:    *VK.Draw_Indexed_Indirect_Command;
+    render_item_buffer:       GPU_Buffer;
+    render_item_pointer:      *Render_Item;
 }
 
 Frame_Constants :: struct {
@@ -105,6 +113,18 @@ GPU_Buffer :: struct {
     allocation:      VMA.Allocation;
     allocation_info: VMA.Allocation_Info;
     device_address:  u64;
+}
+
+Camera :: struct {
+    yaw:      float = 1.570796;
+    pitch:    float;
+    distance: float = 10;
+}
+
+Render_Item :: struct {
+    wvp:            Matrix4;
+    world_matrix:   Matrix4;
+    material_index: u32;
 }
 
 init :: (
@@ -185,11 +205,15 @@ init :: (
     array_resize(*renderer.vertices, VERTEX_BUFFER_SIZE / size_of(Vertex));
     array_resize(*renderer.indices, INDEX_BUFFER_SIZE / size_of(u32));
 
+    create_indirect_draw_buffers(renderer.device, renderer.allocator, renderer.frame_resources_list);
+
     return renderer;
 }
 
 deinit :: (renderer: *Renderer) {
     VK.device_wait_idle(renderer.device);
+
+    array_free(renderer.node_render_stack);
 
     VK.destroy_descriptor_set_layout(renderer.device, renderer.global_descriptor_set_layout);
     VK.destroy_descriptor_pool(renderer.device, renderer.global_descriptor_pool);
@@ -222,7 +246,7 @@ deinit :: (renderer: *Renderer) {
     VK.destroy_command_pool(renderer.device, renderer.transient_command_pool);
 
     for *frame_resources: renderer.frame_resources_list {
-        destroy_frame_resources(renderer.device, frame_resources);
+        destroy_frame_resources(renderer.device, renderer.allocator, frame_resources);
     }
 
     VK.destroy_semaphore(renderer.device, renderer.timeline_semaphore);
@@ -390,13 +414,13 @@ start_rendering :: (renderer: *Renderer) {
             renderer.device, renderer.allocator, .STORAGE_BUFFER | .SHADER_DEVICE_ADDRESS, xx material_data_size, .AUTO, mappable = true
         );
 
-        material_buffer_id := add_buffer(*renderer.buffers, material_buffer);
+        renderer.material_buffer_id = add_buffer(*renderer.buffers, material_buffer);
 
         map_copy_buffer_data(renderer.allocator, material_buffer, 0, renderer.materials.data, material_data_size);
     }
 }
 
-render :: (renderer: *Renderer) {
+render :: (renderer: *Renderer, nodes: []Node) {
     if renderer.should_recreate_swapchain {
         VK.device_wait_idle(renderer.device);
 
@@ -436,7 +460,7 @@ render :: (renderer: *Renderer) {
     };
     VK.wait_semaphores(renderer.device, *wait_info, U64_MAX);
 
-    frame_resources := renderer.frame_resources_list[frame_resources_index];
+    frame_resources := *renderer.frame_resources_list[frame_resources_index];
 
     result := VK.reset_command_pool(renderer.device, frame_resources.command_pool, 0);
     ASSERT_SUCCESS("Reset command pool");
@@ -456,6 +480,63 @@ render :: (renderer: *Renderer) {
         renderer.should_recreate_swapchain = true;
     } else {
         ASSERT_SUCCESS("Acquire next image");
+    }
+
+    camera_position := Vector3.{
+        cos(renderer.camera.yaw) * cos(renderer.camera.pitch),
+        sin(renderer.camera.pitch),
+        sin(renderer.camera.yaw) * cos(renderer.camera.pitch)
+    } * renderer.camera.distance;
+
+    aspect_ratio := cast(float, renderer.swapchain_info.config.image_extent.width) / cast(float, renderer.swapchain_info.config.image_extent.height);
+
+    view_transform    := make_look_at_matrix(camera_position, { 0, 0, 0 }, { 0, 1, 0 }, x_is_forward = false);
+    projection_matrix := make_projection_matrix(1.308997, aspect_ratio, 0.01, 1000, depth_range_01 = true);
+    view_projection_matrix := projection_matrix * view_transform;
+
+    array_reset(*renderer.node_render_stack);
+    node_id := 1;
+    while node_id {
+        node := *nodes[node_id - 1];
+        array_add(*renderer.node_render_stack, { node, Matrix4_Identity });
+        node_id = node.next_sibling_id;
+    }
+
+    draw_index: u32;
+    while renderer.node_render_stack.count > 0 {
+        node_data := pop(*renderer.node_render_stack);
+
+        world_matrix := node_data.matrix * node_data.node.transform;
+
+        if node_data.node.mesh_id {
+            mesh := renderer.meshes[node_data.node.mesh_id - 1];
+
+            for sub_mesh: mesh.sub_meshes {
+                frame_resources.indirect_draw_pointer[draw_index] = {
+                    index_count    = xx sub_mesh.index_count,
+                    instance_count = 1,
+                    first_index    = xx sub_mesh.index_start,
+                    vertex_offset  = xx sub_mesh.vertex_start,
+                    first_instance = draw_index,
+                };
+
+                frame_resources.render_item_pointer[draw_index] = {
+                    wvp            = transpose(view_projection_matrix * world_matrix),
+                    world_matrix   = transpose(world_matrix),
+                    material_index = sub_mesh.material_id - 1,
+                };
+
+                draw_index += 1;
+            }
+        }
+
+        child_node_id := node_data.node.first_child_id;
+
+        while child_node_id {
+            child_node := *nodes[child_node_id - 1];
+            array_add(*renderer.node_render_stack, { child_node, world_matrix });
+            child_node_id = child_node.next_sibling_id;
+        }
     }
 
     command_buffer_begin_info := VK.Command_Buffer_Begin_Info.{
@@ -533,13 +614,43 @@ render :: (renderer: *Renderer) {
         p_depth_attachment = *depth_rendering_attachment_info,
     };
 
+    VK.cmd_bind_descriptor_sets(
+        frame_resources.command_buffer,
+        .GRAPHICS,
+        renderer.graphics_pipeline_info.layout,
+        0,
+        .[renderer.global_descriptor_set],
+        .[],
+    );
+
+    frame_constants: Frame_Constants;
+    vertex_buffer := renderer.buffers[renderer.vertex_buffer_id - 1];
+    material_buffer := renderer.buffers[renderer.material_buffer_id - 1];
+    frame_constants.vertex_buffer_address = vertex_buffer.device_address;
+    frame_constants.material_buffer_address = material_buffer.device_address;
+    frame_constants.render_items_address = frame_resources.render_item_buffer.device_address;
+    VK.cmd_push_constants(
+        frame_resources.command_buffer,
+        renderer.graphics_pipeline_info.layout,
+        .VERTEX | .FRAGMENT,
+        0,
+        size_of(Frame_Constants),
+        *frame_constants,
+    );
+
+    index_buffer := renderer.buffers[renderer.index_buffer_id - 1];
+
+    VK.cmd_bind_index_buffer(frame_resources.command_buffer, index_buffer.buffer, 0, .UINT32);
+
     VK.cmd_begin_rendering(frame_resources.command_buffer, *rendering_info);
 
     viewport := VK.Viewport.{
-        x      = 0,
-        y      = 0,
-        width  = xx renderer.swapchain_info.config.image_extent.width,
-        height = xx renderer.swapchain_info.config.image_extent.height,
+        x         = 0,
+        y         = xx renderer.swapchain_info.config.image_extent.height,
+        width     = xx renderer.swapchain_info.config.image_extent.width,
+        height    = -cast(float, renderer.swapchain_info.config.image_extent.height),
+        min_depth = 0,
+        max_depth = 1,
     };
     VK.cmd_set_viewport(frame_resources.command_buffer, VK.Viewport.[viewport]);
 
@@ -554,12 +665,12 @@ render :: (renderer: *Renderer) {
 
     VK.cmd_bind_pipeline(frame_resources.command_buffer, .GRAPHICS, renderer.graphics_pipeline_info.pipeline);
 
-    VK.cmd_draw(
+    VK.cmd_draw_indexed_indirect(
         frame_resources.command_buffer,
-        vertex_count   = 3,
-        instance_count = 1,
-        first_vertex   = 0,
-        first_instance = 0,
+        frame_resources.indirect_draw_buffer.buffer,
+        offset = 0,
+        draw_count = draw_index,
+        stride = size_of(VK.Draw_Indexed_Indirect_Command),
     );
 
     VK.cmd_end_rendering(frame_resources.command_buffer);
@@ -654,9 +765,37 @@ DEPTH_FORMAT   :: VK.Format.D32_SFLOAT;
 MAX_FRAMES_IN_FLIGHT_COUNT :: 2;
 
 MAX_TEXTURES :: 256;
+MAX_INDIRECT_BUFFER_SIZE :: 4096 * size_of(VK.Draw_Indexed_Indirect_Command);
+MAX_RENDER_ITEM_BUFFER_SIZE :: 4096 * size_of(Render_Item);
 
 ASSERT_SUCCESS :: (name: string) #expand {
     assert(`result == .SUCCESS, name);
+}
+
+create_indirect_draw_buffers :: (device: VK.Device, allocator: VMA.Allocator, frame_resources_list: []Frame_Resources) {
+    for *frame_resources: frame_resources_list {
+        frame_resources.indirect_draw_buffer = create_buffer(
+            device,
+            allocator,
+            .INDIRECT_BUFFER,
+            MAX_INDIRECT_BUFFER_SIZE,
+            .AUTO,
+            mappable = true,
+        );
+        result:, frame_resources.indirect_draw_pointer = VMA.map_memory(allocator, frame_resources.indirect_draw_buffer.allocation);
+        ASSERT_SUCCESS("Map memory");
+
+        frame_resources.render_item_buffer = create_buffer(
+            device,
+            allocator,
+            .STORAGE_BUFFER | .SHADER_DEVICE_ADDRESS,
+            MAX_RENDER_ITEM_BUFFER_SIZE,
+            .AUTO,
+            mappable = true,
+        );
+        result, frame_resources.render_item_pointer = VMA.map_memory(allocator, frame_resources.render_item_buffer.allocation);
+        ASSERT_SUCCESS("Map memory");
+    }
 }
 
 create_descriptor_sets :: (device: VK.Device) -> VK.Descriptor_Pool, VK.Descriptor_Set_Layout, VK.Descriptor_Set {
@@ -914,12 +1053,12 @@ map_copy_buffer_data :: (allocator: VMA.Allocator, buffer: GPU_Buffer, buffer_of
 }
 
 create_buffer :: (
-    device: VK.Device,
-    allocator: VMA.Allocator,
-    usage: VK.Buffer_Usage_Flags,
-    byte_size: u64,
+    device:       VK.Device,
+    allocator:    VMA.Allocator,
+    usage:        VK.Buffer_Usage_Flags,
+    byte_size:    u64,
     memory_usage: VMA.Memory_Usage,
-    mappable: bool,
+    mappable:     bool,
 ) -> GPU_Buffer {
     buffer: GPU_Buffer = ---;
 
@@ -986,10 +1125,16 @@ create_transient_command_pool :: (device: VK.Device, qfi: u32) -> VK.Command_Poo
 
 destroy_frame_resources :: (
     device: VK.Device,
+    allocator: VMA.Allocator,
     frame_resources: *Frame_Resources,
 ) {
     VK.destroy_semaphore(device, frame_resources.image_acquired_semaphore);
     VK.destroy_command_pool(device, frame_resources.command_pool);
+
+    VMA.unmap_memory(allocator, frame_resources.indirect_draw_buffer.allocation);
+    VMA.destroy_buffer(allocator, frame_resources.indirect_draw_buffer.buffer, frame_resources.indirect_draw_buffer.allocation);
+    VMA.unmap_memory(allocator, frame_resources.render_item_buffer.allocation);
+    VMA.destroy_buffer(allocator, frame_resources.render_item_buffer.buffer, frame_resources.render_item_buffer.allocation);
 
     frame_resources.* = {};
 }
@@ -1382,7 +1527,12 @@ create_device :: (physical_device: VK.Physical_Device, graphics_qfi: u32) -> VK.
             && supported_features_12.timeline_semaphore
             && supported_features_12.buffer_device_address
             && supported_features_12.descriptor_binding_sampled_image_update_after_bind
-            && supported_features_12.descriptor_binding_partially_bound,
+            && supported_features_12.descriptor_binding_partially_bound
+            && supported_features_12.scalar_block_layout
+            && supported_features_12.runtime_descriptor_array
+            && supported_features.features.multi_draw_indirect
+            && supported_features.features.draw_indirect_first_instance
+            && supported_features.features.shader_int64,
             "One of the required features is not supported",
         );
     }
@@ -1399,8 +1549,17 @@ create_device :: (physical_device: VK.Physical_Device, graphics_qfi: u32) -> VK.
         buffer_device_address                              = VK.TRUE,
         descriptor_binding_sampled_image_update_after_bind = VK.TRUE,
         descriptor_binding_partially_bound                 = VK.TRUE,
+        scalar_block_layout                                = VK.TRUE,
+        runtime_descriptor_array                           = VK.TRUE,
     };
-    desired_features := VK.Physical_Device_Features_2.{ p_next = *desired_features_12 };
+    desired_features := VK.Physical_Device_Features_2.{
+        p_next = *desired_features_12,
+        features = {
+            multi_draw_indirect          = VK.TRUE,
+            shader_int64                 = VK.TRUE,
+            draw_indirect_first_instance = VK.TRUE,
+        }
+    };
 
     queue_priorities := float.[1];
     device_queue_create_infos := VK.Device_Queue_Create_Info.[

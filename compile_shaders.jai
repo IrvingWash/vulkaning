@@ -1,7 +1,7 @@
 compile_shaders :: (optimization_type: Optimization_Type) -> error: string {
     output_path := tprint("%/%/shaders", SHADERS_OUTPUT_PATH_BASE, optimization_type);
 
-    ok := make_directory_if_it_does_not_exist(output_path);
+    ok := make_directory_if_it_does_not_exist(output_path, recursive = true);
     if !ok {
         return tprint("Failed to create directory at %", output_path);
     }

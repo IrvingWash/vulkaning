@@ -43,6 +43,7 @@ Allocation_Create_Info :: struct {
     pool:             Pool;
     p_user_data:      *void;
     priority:         float;
+    min_alignment:    Device_Size;
 }
 
 Allocation_Info :: struct {
