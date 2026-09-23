@@ -6,3 +6,6 @@ Currently:
 - TinyGLTF for GLTF-scene loading
 - Timeline semaphore and "Frames in Flight"
 - Dynamic rendering
+- Indirect drawing
+- Vertex pulling
+- etc
